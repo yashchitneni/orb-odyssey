@@ -371,7 +371,7 @@ class LobbyScene extends Phaser.Scene {
 • Level up (1-4)
 • Use abilities
 • Control Nebula
-• First to 100 wins!
+• First to ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET} wins!
 
 CONTROLS:
 WASD - Move

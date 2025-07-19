@@ -110,7 +110,13 @@ class EndScreenScene extends Phaser.Scene {
         playAgainButton.on('pointerdown', () => {
             this.audioManager.playUISound('click');
             this.audioManager.stopMusic();
-            this.scene.start('LobbyScene');
+            // Go to upgrade scene for multi-round gameplay
+            this.scene.start('UpgradeScene', { 
+                results: this.results, 
+                winner: this.winner,
+                winType: this.winType,
+                round: 1  // TODO: Track actual round number
+            });
         });
 
         if (this.game.socket) {
@@ -136,7 +142,7 @@ class EndScreenScene extends Phaser.Scene {
     getWinnerText(winnerData) {
         switch (this.winType) {
             case GAME_CONSTANTS.WIN_TYPES.CRYSTALS:
-                return `${winnerData.name} collected 100 crystals!`;
+                return `${winnerData.name} collected ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET} crystals!`;
             case GAME_CONSTANTS.WIN_TYPES.NEBULA_CONTROL:
                 return `${winnerData.name} controlled the Nebula Core!`;
             case GAME_CONSTANTS.WIN_TYPES.TIME_LIMIT:

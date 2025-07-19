@@ -294,7 +294,7 @@ function endGame(winnerId = null, winType = null) {
     gameState.winner = winnerId;
     gameState.winType = winType;
     
-    const results = Object.values(gameState.players)
+    const playerResults = Object.values(gameState.players)
         .sort((a, b) => b.crystalsCollected - a.crystalsCollected)
         .map(player => ({
             id: player.id,
@@ -304,8 +304,8 @@ function endGame(winnerId = null, winType = null) {
             level: player.level
         }));
     
-    io.emit('gameEnd', {
-        results,
+    io.emit('gameEnded', {
+        players: playerResults,
         winner: winnerId,
         winType: winType
     });
@@ -627,6 +627,9 @@ function updateGame() {
                 player.score += crystal.value;
                 player.crystalsCollected += 1;
                 
+                // Store crystal position before any operations
+                const crystalPosition = { x: crystal.x, y: crystal.y };
+                
                 // Check for level up
                 const previousLevel = player.level;
                 for (let level = 4; level >= 1; level--) {
@@ -634,12 +637,6 @@ function updateGame() {
                         player.level = level;
                         break;
                     }
-                }
-                
-                // Check for crystal win condition
-                if (player.crystalsCollected >= GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET) {
-                    endGame(player.id, GAME_CONSTANTS.WIN_TYPES.CRYSTALS);
-                    return;
                 }
                 
                 // Update abilities based on level
@@ -650,7 +647,10 @@ function updateGame() {
                     player.abilities.wall.available = true;
                 }
                 
+                // Delete crystal from game state
                 delete gameState.crystals[crystalId];
+                
+                // Emit crystal collected event with position
                 io.emit('crystalCollected', { 
                     crystalId, 
                     playerId,
@@ -658,8 +658,15 @@ function updateGame() {
                     value: crystal.value,
                     crystalsCollected: player.crystalsCollected,
                     level: player.level,
-                    leveledUp: player.level > previousLevel
+                    leveledUp: player.level > previousLevel,
+                    position: crystalPosition  // Always include position
                 });
+                
+                // Check for crystal win condition AFTER emitting the event
+                if (player.crystalsCollected >= GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET) {
+                    endGame(player.id, GAME_CONSTANTS.WIN_TYPES.CRYSTALS);
+                    return;
+                }
                 
                 // Respawn crystal after random delay
                 const respawnDelay = Math.random() * 
@@ -846,7 +853,7 @@ io.on('connection', (socket) => {
         const player = gameState.players[socket.playerId];
         if (!player) return;
         
-        const abilityName = typeof data === 'string' ? data : data.ability;
+        const abilityName = typeof data === 'string' ? data : data.type;
         const ability = player.abilities[abilityName];
         if (!ability || !ability.available || ability.cooldown > 0) return;
         
@@ -988,6 +995,11 @@ io.on('connection', (socket) => {
             name: p.name
         }));
         socket.emit('playerList', playerList);
+    });
+    
+    socket.on('selectUpgrade', (data) => {
+        console.log(`Player ${socket.playerId} selected upgrade: ${data.upgradeId} for round ${data.round}`);
+        // TODO: Store upgrade selections for multi-round gameplay
     });
     
     socket.on('disconnect', () => {

@@ -48,6 +48,26 @@ class GameArenaScene extends Phaser.Scene {
         this.lastInputVector = { x: 0, y: 0 };
     }
 
+    init() {
+        // Reset all game state when scene starts/restarts
+        this.players = {};
+        this.orbs = {};
+        this.crystals = {};
+        this.myId = null;
+        this.trails = {};
+        this.inputVector = { x: 0, y: 0 };
+        this.walls = [];
+        this.updateCounter = 0;
+        this.currentPerformanceMode = 'medium';
+        this.energy = 100;
+        this.lastInputVector = { x: 0, y: 0 };
+        
+        // Clean up any existing tweens
+        if (this.tweens) {
+            this.tweens.killAll();
+        }
+    }
+
     preload() {
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         this.audioManager = new AudioManager(this);
@@ -505,7 +525,14 @@ class GameArenaScene extends Phaser.Scene {
         this.game.socket.on('crystalCollected', (data) => {
             this.removeCrystal(data.crystalId);
             this.updatePlayerCrystals(data.playerId, data.crystalsCollected);
-            this.createCrystalCollectionEffect(data.position, data.isPowerCrystal);
+            
+            // Safeguard: Only create effect if position data exists
+            if (data.position && data.position.x !== undefined && data.position.y !== undefined) {
+                this.createCrystalCollectionEffect(data.position, data.isPowerCrystal);
+            } else {
+                console.warn('Crystal collected but position data missing:', data);
+            }
+            
             if (data.playerId === this.myId) {
                 this.audioManager.playCrystalCollectionSound(data.isPowerCrystal);
             }
@@ -539,7 +566,7 @@ class GameArenaScene extends Phaser.Scene {
 
         this.game.socket.on('gameEnded', (results) => {
             this.audioManager.stopGameplayMusic();
-            this.scene.start('EndScreenScene', { results: results.players, winner: results.winner, winType: results.winType });
+            this.scene.start('EndScreenScene', { results: results.players, winner: results.winner, winType: results.winType, isPlayerWinner: results.winner === this.myId });
         });
 
         this.game.socket.on('warmupEnd', () => {
@@ -610,12 +637,15 @@ class GameArenaScene extends Phaser.Scene {
         // Update game phase
         if (data.gamePhase) {
             this.gamePhase = data.gamePhase;
+            this.showGameStateIndicator(this.gamePhase);
         }
 
         // Update nebula core
         if (data.nebulaCore) {
             this.updateNebulaCoreControl(data.nebulaCore);
         }
+        
+        this.updatePlayerList(data.players);
     }
 
     addPlayer(playerId, playerData) {
@@ -1434,7 +1464,7 @@ class GameArenaScene extends Phaser.Scene {
         this.winPanel.strokeRoundedRect(x, y, panelWidth, panelHeight, 12);
         
         // Win condition text
-        this.winConditionText = this.add.text(400, y + panelHeight / 2, 'First to 100 crystals wins!', {
+        this.winConditionText = this.add.text(400, y + panelHeight / 2, `First to ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET} crystals wins!`, {
             fontSize: '22px',
             fontFamily: 'Arial Black',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
@@ -1478,7 +1508,7 @@ class GameArenaScene extends Phaser.Scene {
         // Add players with their stats
         Object.values(players).forEach((player, index) => {
             const yPos = index * 25;
-            const isMe = player.id === this.myId;
+            const isMe = player.playerId === this.myId;
             
             // Player name/indicator
             const playerText = this.add.text(0, yPos, isMe ? 'You' : `P${index + 1}`, {
@@ -1890,6 +1920,11 @@ class GameArenaScene extends Phaser.Scene {
         if (!this.isMobile && this.updateCounter % 10 === 0 && this.updateMinimap) {
             this.updateMinimap();
         }
+        
+        // Update player list less frequently
+        if (!this.isMobile && this.updateCounter % 30 === 0 && this.updatePlayerList) {
+            this.updatePlayerList(this.players);
+        }
     }
     
     setPerformanceMode(mode) {
@@ -2050,6 +2085,7 @@ class GameArenaScene extends Phaser.Scene {
                     }
                     if (playerDelta.energy !== undefined && playerDelta.id === this.myId) {
                         this.energy = playerDelta.energy;
+                        this.updateEnergyBar(this.energy, 100);
                     }
                 }
             });
