@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orb Odyssey</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: Arial, sans-serif;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container"></div>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="/shared/constants.js"></script>
+    <script src="AudioManager.js"></script>
+    <script src="AudioSettingsPanel.js"></script>
+    <script src="scenes/Preloader.js"></script>
+    <script src="scenes/Lobby.js"></script>
+    <script src="scenes/GameArena.js"></script>
+    <script src="scenes/EndScreen.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>

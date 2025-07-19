@@ -1,0 +1,23 @@
+{
+  "name": "orb-odyssey",
+  "version": "1.0.0",
+  "description": "A real-time multiplayer browser game built with Phaser.js and Socket.io",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "nodemon server/server.js",
+    "client": "npx http-server client -p 8080 -c-1"
+  },
+  "keywords": ["game", "multiplayer", "phaser", "socket.io"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "phaser": "^3.70.0",
+    "socket.io-client": "^4.7.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  }
+}

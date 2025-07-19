@@ -1,0 +1,21 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Create initial project structure",
+        "description": "Set up the basic project structure with package.json, directory structure, and initial files",
+        "status": "done",
+        "priority": "high",
+        "details": "Create package.json with Phaser, Socket.io, Express dependencies. Set up client/server/shared directory structure. Create basic HTML, game.js, and server.js files.",
+        "dependencies": [],
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-07-18T22:38:49.003Z",
+      "updated": "2025-07-19T00:03:57.217Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

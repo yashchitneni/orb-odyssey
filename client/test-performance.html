@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orb Odyssey - Performance Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        .performance-info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+        }
+        .performance-info h3 {
+            margin: 0 0 10px 0;
+            color: #00ff00;
+        }
+        .hotkeys {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px;
+            border: 1px solid #00ffff;
+            border-radius: 5px;
+            font-size: 11px;
+            z-index: 1000;
+        }
+        .hotkeys h3 {
+            margin: 0 0 10px 0;
+            color: #00ffff;
+        }
+        .hotkeys div {
+            margin: 2px 0;
+        }
+        #game-container {
+            width: 100%;
+            height: 600px;
+            border: 2px solid #333;
+            margin: 20px 0;
+        }
+        .test-results {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0, 50, 0, 0.3);
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+        }
+        .recommendations {
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(50, 50, 0, 0.3);
+            border: 1px solid #ffff00;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Orb Odyssey - Performance Testing Suite</h1>
+    
+    <div class="performance-info">
+        <h3>Performance Monitor</h3>
+        <div>Press F1 to toggle detailed view</div>
+        <div id="fps-display">FPS: --</div>
+        <div id="memory-display">Memory: -- MB</div>
+        <div id="network-display">Ping: -- ms</div>
+        <div id="objects-display">Objects: --</div>
+    </div>
+    
+    <div class="hotkeys">
+        <h3>Performance Hotkeys</h3>
+        <div><strong>F1:</strong> Toggle performance monitor</div>
+        <div><strong>F2:</strong> Quick FPS test (10s)</div>
+        <div><strong>F3:</strong> Quick memory test (15s)</div>
+        <div><strong>F4:</strong> Medium stress test (1m)</div>
+        <div><strong>F5:</strong> High stress test (2m)</div>
+        <div><strong>F6:</strong> Stop stress test</div>
+        <div><strong>F7:</strong> Manual memory cleanup</div>
+        <div><strong>F8:</strong> Toggle performance mode</div>
+        <div><strong>F9:</strong> Get performance report</div>
+        <div><strong>F10:</strong> Server performance stats</div>
+    </div>
+    
+    <div id="game-container"></div>
+    
+    <div class="test-results" id="test-results" style="display: none;">
+        <h3>Test Results</h3>
+        <div id="results-content"></div>
+    </div>
+    
+    <div class="recommendations" id="recommendations" style="display: none;">
+        <h3>Performance Recommendations</h3>
+        <div id="recommendations-content"></div>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <h3>Manual Testing</h3>
+        <button onclick="runFpsTest()">Quick FPS Test</button>
+        <button onclick="runMemoryTest()">Memory Test</button>
+        <button onclick="runStressTest('medium')">Medium Stress Test</button>
+        <button onclick="runStressTest('high')">High Stress Test</button>
+        <button onclick="stopTest()">Stop Test</button>
+        <button onclick="getPerformanceReport()">Get Report</button>
+    </div>
+    
+    <div style="margin: 20px 0;">
+        <h3>Performance Information</h3>
+        <p>This test page includes the performance monitoring and stress testing systems:</p>
+        <ul>
+            <li><strong>Performance Monitor:</strong> Real-time FPS, memory, and network monitoring</li>
+            <li><strong>Object Pooling:</strong> Optimized particle and object management</li>
+            <li><strong>Delta Compression:</strong> Reduced network data transmission</li>
+            <li><strong>Client-side Prediction:</strong> Smoother player movement</li>
+            <li><strong>Adaptive Quality:</strong> Automatic performance mode switching</li>
+            <li><strong>Stress Testing:</strong> Comprehensive performance testing suite</li>
+        </ul>
+        
+        <h4>Performance Modes:</h4>
+        <ul>
+            <li><strong>High:</strong> All visual effects enabled</li>
+            <li><strong>Medium:</strong> Reduced particle effects</li>
+            <li><strong>Low:</strong> Minimal visual effects, maximum performance</li>
+        </ul>
+        
+        <h4>Optimization Features:</h4>
+        <ul>
+            <li>Object pooling for particles and temporary objects</li>
+            <li>Network message throttling and delta compression</li>
+            <li>Client-side prediction with server reconciliation</li>
+            <li>Adaptive update rates based on performance</li>
+            <li>Automatic object culling outside view</li>
+            <li>Memory cleanup and garbage collection</li>
+        </ul>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.0/dist/phaser.min.js"></script>
+    <script src="../shared/constants.js"></script>
+    <script src="PerformanceMonitor.js"></script>
+    <script src="ObjectPool.js"></script>
+    <script src="StressTester.js"></script>
+    
+    <script>
+        // Mock game environment for testing
+        class TestGameScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'TestScene' });
+                this.testObjects = [];
+            }
+            
+            preload() {
+                // Create simple colored rectangles for testing
+                this.load.image('test-sprite', 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==');
+            }
+            
+            create() {
+                // Initialize performance systems
+                this.objectPool = new ObjectPool();
+                this.particleSystem = new ParticleSystem(this, this.objectPool);
+                this.performanceMonitor = new PerformanceMonitor(this);
+                this.stressTester = new StressTester(this);
+                
+                // Set up hotkeys
+                this.setupTestHotkeys();
+                
+                // Update performance display
+                this.time.addEvent({
+                    delay: 1000,
+                    callback: this.updatePerformanceDisplay,
+                    callbackScope: this,
+                    loop: true
+                });
+                
+                // Create some test objects
+                this.createTestObjects();
+            }
+            
+            setupTestHotkeys() {
+                this.input.keyboard.on('keydown-F1', () => {
+                    this.performanceMonitor.toggleDisplay();
+                });
+                
+                this.input.keyboard.on('keydown-F2', () => {
+                    this.stressTester.quickFpsTest();
+                });
+                
+                this.input.keyboard.on('keydown-F3', () => {
+                    this.stressTester.quickMemoryTest();
+                });
+                
+                this.input.keyboard.on('keydown-F4', () => {
+                    this.stressTester.startStressTest('medium');
+                });
+                
+                this.input.keyboard.on('keydown-F5', () => {
+                    this.stressTester.startStressTest('high');
+                });
+                
+                this.input.keyboard.on('keydown-F6', () => {
+                    if (this.stressTester.isRunning) {
+                        const results = this.stressTester.stopStressTest();
+                        this.showTestResults(results);
+                    }
+                });
+            }
+            
+            createTestObjects() {
+                // Create some animated test objects
+                for (let i = 0; i < 50; i++) {
+                    const x = Math.random() * 800;
+                    const y = Math.random() * 600;
+                    const obj = this.add.circle(x, y, 5 + Math.random() * 10, Math.random() * 0xffffff);
+                    
+                    this.tweens.add({
+                        targets: obj,
+                        x: x + (Math.random() - 0.5) * 200,
+                        y: y + (Math.random() - 0.5) * 200,
+                        duration: 2000 + Math.random() * 3000,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut'
+                    });
+                    
+                    this.testObjects.push(obj);
+                }
+            }
+            
+            updatePerformanceDisplay() {
+                if (this.performanceMonitor) {
+                    const stats = this.performanceMonitor.getAverageStats();
+                    document.getElementById('fps-display').textContent = `FPS: ${stats.avgFps}`;
+                    document.getElementById('memory-display').textContent = `Memory: ${stats.memoryMB} MB`;
+                    document.getElementById('network-display').textContent = `Ping: ${stats.avgPing} ms`;
+                    document.getElementById('objects-display').textContent = `Objects: ${stats.objectCount}`;
+                }
+            }
+            
+            showTestResults(results) {
+                const resultsDiv = document.getElementById('test-results');
+                const contentDiv = document.getElementById('results-content');
+                
+                contentDiv.innerHTML = `
+                    <div><strong>Test Level:</strong> ${results.level}</div>
+                    <div><strong>Duration:</strong> ${(results.duration / 1000).toFixed(1)}s</div>
+                    <div><strong>Average FPS:</strong> ${results.avgFps?.toFixed(1) || 'N/A'}</div>
+                    <div><strong>Average Memory:</strong> ${results.avgMemory?.toFixed(1) || 'N/A'} MB</div>
+                    <div><strong>Average Network:</strong> ${results.avgNetwork?.toFixed(1) || 'N/A'} ms</div>
+                    <div><strong>Crashed:</strong> ${results.crashed ? 'Yes' : 'No'}</div>
+                `;
+                
+                resultsDiv.style.display = 'block';
+                
+                // Show recommendations
+                const recommendations = this.stressTester.getRecommendations(results);
+                if (recommendations.length > 0) {
+                    const recDiv = document.getElementById('recommendations');
+                    const recContent = document.getElementById('recommendations-content');
+                    
+                    recContent.innerHTML = recommendations.map(rec => `<div>• ${rec}</div>`).join('');
+                    recDiv.style.display = 'block';
+                }
+            }
+        }
+        
+        // Game configuration
+        const config = {
+            type: Phaser.AUTO,
+            width: 800,
+            height: 600,
+            parent: 'game-container',
+            backgroundColor: '#000022',
+            scene: TestGameScene,
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 0 },
+                    debug: false
+                }
+            }
+        };
+        
+        // Start game
+        const game = new Phaser.Game(config);
+        let currentScene = null;
+        
+        game.scene.start('TestScene');
+        
+        // Wait for scene to be ready
+        game.events.on('ready', () => {
+            currentScene = game.scene.getScene('TestScene');
+        });
+        
+        // Manual test functions
+        function runFpsTest() {
+            if (currentScene && currentScene.stressTester) {
+                currentScene.stressTester.quickFpsTest();
+            }
+        }
+        
+        function runMemoryTest() {
+            if (currentScene && currentScene.stressTester) {
+                currentScene.stressTester.quickMemoryTest();
+            }
+        }
+        
+        function runStressTest(level) {
+            if (currentScene && currentScene.stressTester) {
+                currentScene.stressTester.startStressTest(level);
+            }
+        }
+        
+        function stopTest() {
+            if (currentScene && currentScene.stressTester && currentScene.stressTester.isRunning) {
+                const results = currentScene.stressTester.stopStressTest();
+                currentScene.showTestResults(results);
+            }
+        }
+        
+        function getPerformanceReport() {
+            if (currentScene && currentScene.performanceMonitor) {
+                const report = {
+                    performance: currentScene.performanceMonitor.getAverageStats(),
+                    objectPools: currentScene.objectPool ? currentScene.objectPool.getAllStats() : {}
+                };
+                console.log('Performance Report:', report);
+                alert('Performance report logged to console');
+            }
+        }
+    </script>
+</body>
+</html>
