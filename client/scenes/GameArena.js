@@ -180,7 +180,8 @@ class GameArenaScene extends Phaser.Scene {
 
         this.progressBar.clear();
         if (barWidth > 0) {
-            const colors = GAME_CONSTANTS.UI.GRADIENTS.PROGRESS;
+            // Use XP gradient since PROGRESS gradient doesn't exist
+            const colors = GAME_CONSTANTS.UI.GRADIENTS.XP;
             this.progressBar.fillGradientStyle(colors[0], colors[1], colors[0], colors[1]);
             this.progressBar.fillRoundedRect(x + 2, y + 2, barWidth, height - 4, 4);
         }
@@ -717,13 +718,13 @@ class GameArenaScene extends Phaser.Scene {
         crystal.setTint(color);
         crystal.setOrigin(0.5);
 
-        const scale = crystalData.isPowerCrystal ? 0.6 : 0.5;
+        const scale = crystalData.isPowerCrystal ? 0.4 : 0.3;  // Reduced from 0.6/0.5
         crystal.setScale(scale);
         
         // Pulsing effect
         this.tweens.add({
             targets: crystal,
-            scale: crystal.scale * 1.1,
+            scale: crystal.scale * 1.05,  // Reduced from 1.1 for subtler pulse
             alpha: 0.7,
             duration: crystalData.isPowerCrystal ? 800 : 1200,
             yoyo: true,
@@ -1046,7 +1047,8 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     createCollectionEffect(position) {
-        const config = GAME_CONSTANTS.VISUAL_EFFECTS.PARTICLES.ORB_COLLECTION;
+        // Use crystal explosion effect for orbs since ORB_COLLECTION doesn't exist
+        const config = GAME_CONSTANTS.VISUAL_EFFECTS.PARTICLES.CRYSTAL_EXPLOSION;
         this.createParticleExplosion(position.x, position.y, config, 0xffff00);
     }
 

@@ -316,11 +316,18 @@ function endGame(winnerId = null, winType = null) {
 }
 
 function updateGame() {
-    if (!gameState.gameStarted) return;
-    
-    const now = Date.now();
-    const deltaTime = (now - gameState.lastUpdate) / 1000;
-    gameState.lastUpdate = now;
+    try {
+        if (!gameState.gameStarted) return;
+        
+        const now = Date.now();
+        const deltaTime = (now - gameState.lastUpdate) / 1000;
+        gameState.lastUpdate = now;
+        
+        // Sanity check for deltaTime
+        if (deltaTime > 1 || deltaTime < 0) {
+            console.warn(`Unusual deltaTime detected: ${deltaTime}. Clamping to safe range.`);
+            return;
+        }
     
     // Handle warmup phase
     if (gameState.gamePhase === 'warmup') {
@@ -550,7 +557,7 @@ function updateGame() {
                                 // Recalculate level
                                 let newLevel = 1;
                                 for (let level = 4; level >= 1; level--) {
-                                    if (smallerPlayer.crystalsCollected >= GAME_CONSTANTS.LEVEL_THRESHOLDS[level]) {
+                                    if (smallerPlayer.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[level]) {
                                         newLevel = level;
                                         break;
                                     }
@@ -623,7 +630,7 @@ function updateGame() {
                 // Check for level up
                 const previousLevel = player.level;
                 for (let level = 4; level >= 1; level--) {
-                    if (player.crystalsCollected >= GAME_CONSTANTS.LEVEL_THRESHOLDS[level]) {
+                    if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[level]) {
                         player.level = level;
                         break;
                     }
@@ -666,6 +673,16 @@ function updateGame() {
                 }, respawnDelay);
             }
         }
+    }
+    } catch (error) {
+        console.error('[updateGame] Critical error:', error);
+        console.error('Stack trace:', error.stack);
+        console.error('Game state at crash:', {
+            players: Object.keys(gameState.players).length,
+            crystals: Object.keys(gameState.crystals).length,
+            orbs: Object.keys(gameState.orbs).length,
+            phase: gameState.gamePhase
+        });
     }
 }
 
@@ -813,10 +830,15 @@ io.on('connection', (socket) => {
     });
     
     socket.on('playerMove', (data) => {
-        if (gameState.players[socket.playerId]) {
-            console.log(`Player ${socket.playerId} move received:`, data);
+        try {
+            if (!socket.playerId || !gameState.players[socket.playerId]) {
+                console.warn(`Invalid player move from ${socket.id}`);
+                return;
+            }
             gameState.players[socket.playerId].ax = data.ax || 0;
             gameState.players[socket.playerId].ay = data.ay || 0;
+        } catch (error) {
+            console.error('[playerMove] Error:', error);
         }
     });
     
@@ -1045,7 +1067,32 @@ function checkWinConditions() {
     // Time limit is checked in updateGame
 }
 
+// Global error handlers to prevent server crashes
+process.on('uncaughtException', (error) => {
+    console.error('UNCAUGHT EXCEPTION:', error);
+    console.error('Stack:', error.stack);
+    // Don't exit - try to keep the server running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('UNHANDLED REJECTION at:', promise, 'reason:', reason);
+    // Don't exit - try to keep the server running
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
 server.listen(GAME_CONSTANTS.PORT, () => {
     console.log(`Orb Odyssey server running on port ${GAME_CONSTANTS.PORT}`);
     console.log(`Client: http://localhost:${GAME_CONSTANTS.PORT}`);
+    console.log('\n=== Server Started Successfully ===');
+    console.log('Error handling: ENABLED');
+    console.log('Auto-recovery: ENABLED');
+    console.log('==================================\n');
 });

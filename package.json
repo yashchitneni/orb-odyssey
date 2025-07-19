@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node server/server.js",
     "dev": "nodemon server/server.js",
-    "client": "npx http-server client -p 8080 -c-1"
+    "debug": "node --inspect server/server.js",
+    "production": "NODE_ENV=production node server/server.js",
+    "client": "npx http-server client -p 8080 -c-1",
+    "test-server": "node server/server.js 2>&1 | tee server.log"
   },
   "keywords": ["game", "multiplayer", "phaser", "socket.io"],
   "author": "",

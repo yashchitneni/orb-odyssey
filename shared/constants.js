@@ -3,7 +3,7 @@ const GAME_CONSTANTS = {
     WORLD_HEIGHT: 600,
     PLAYER_RADIUS: 20,
     ORB_RADIUS: 10,
-    PLAYER_SPEED: 200,
+    PLAYER_SPEED: 300,  // Increased from 200 for higher top speed
     GAME_DURATION: 120,
     ORB_COUNT: 20,
     ORB_SPAWN_DELAY: 1000,
@@ -12,8 +12,8 @@ const GAME_CONSTANTS = {
     PORT: 3000,
     
     // Physics constants
-    PLAYER_ACCELERATION: 400,
-    PLAYER_DRAG: 0.97,
+    PLAYER_ACCELERATION: 800,  // Increased from 400 for faster acceleration
+    PLAYER_DRAG: 0.98,         // Increased from 0.97 for less "floaty" feel
     ACCELERATION_TIME: 0.5,
     BOUNCE_DAMPING: 0.7,
     MIN_VELOCITY: 5,
@@ -32,7 +32,7 @@ const GAME_CONSTANTS = {
     // Crystal constants
     CRYSTAL_COUNT_MIN: 10,
     CRYSTAL_COUNT_MAX: 15,
-    CRYSTAL_RADIUS: 8,
+    CRYSTAL_RADIUS: 5,  // Reduced from 8 for smaller crystal appearance
     CRYSTAL_RESPAWN_MIN: 5000, // 5 seconds
     CRYSTAL_RESPAWN_MAX: 15000, // 15 seconds
     POINTS_PER_CRYSTAL: 10,
@@ -94,7 +94,7 @@ const GAME_CONSTANTS = {
     
     // Win condition constants
     WIN_CONDITIONS: {
-        CRYSTAL_TARGET: 100, // Primary win condition
+        CRYSTAL_TARGET: 10,  // Reduced from 100 for faster games
         GAME_DURATION: 600000, // 10 minutes in milliseconds
         WARMUP_DURATION: 10000 // 10 seconds warmup
     },
