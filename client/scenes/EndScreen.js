@@ -9,6 +9,8 @@ class EndScreenScene extends Phaser.Scene {
         this.winner = data.winner || null;
         this.winType = data.winType || null;
         this.isPlayerWinner = data.isPlayerWinner || false;
+        this.isFinalScreen = data.isFinalScreen || false;
+        this.seriesScores = data.seriesScores || {};
     }
 
     create() {
@@ -26,8 +28,8 @@ class EndScreenScene extends Phaser.Scene {
         // Background
         this.add.rectangle(400, 300, 800, 600, 0x000033);
         
-        // Victory title based on win type
-        const titleText = this.getVictoryTitle();
+        // Victory title based on win type and whether it's final
+        const titleText = this.isFinalScreen ? 'SERIES COMPLETE!' : this.getVictoryTitle();
         this.add.text(400, 60, titleText, { 
             fontSize: '48px', 
             fill: '#fff',
@@ -58,12 +60,45 @@ class EndScreenScene extends Phaser.Scene {
             wordWrap: { width: 600 }
         }).setOrigin(0.5);
 
-        this.add.text(400, 230, 'Final Results:', { 
+        // Show series scores if it's the final screen
+        let yPos = 230;
+        if (this.isFinalScreen && this.seriesScores) {
+            let scoresY = 200;
+            this.add.text(400, scoresY, 'Series Results:', { 
+                fontSize: '32px', 
+                fill: '#fff',
+                fontWeight: 'bold'
+            }).setOrigin(0.5);
+            
+            scoresY += 40;
+            const sortedScores = Object.entries(this.seriesScores).sort((a, b) => b[1] - a[1]);
+            
+            sortedScores.forEach(([playerId, wins], index) => {
+                const player = this.results.find(p => p.id === playerId);
+                if (player) {
+                    const medal = index === 0 ? '🏆' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+                    const text = `${medal} ${player.name}: ${wins} rounds won`;
+                    
+                    this.add.text(400, scoresY, text, { 
+                        fontSize: '24px', 
+                        fill: index === 0 ? '#ffd700' : '#fff',
+                        fontWeight: index === 0 ? 'bold' : 'normal'
+                    }).setOrigin(0.5);
+                    
+                    scoresY += 35;
+                }
+            });
+            
+            scoresY += 20;
+            yPos = scoresY;
+        }
+        
+        this.add.text(400, yPos, this.isFinalScreen ? 'Round Stats:' : 'Final Results:', { 
             fontSize: '28px', 
             fill: '#fff' 
         }).setOrigin(0.5);
 
-        let yPos = 280;
+        yPos = yPos + 50;
         this.results.forEach((player, index) => {
             const isWinner = player.id === this.winner;
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
@@ -110,13 +145,15 @@ class EndScreenScene extends Phaser.Scene {
         playAgainButton.on('pointerdown', () => {
             this.audioManager.playUISound('click');
             this.audioManager.stopMusic();
-            // Go to upgrade scene for multi-round gameplay
-            this.scene.start('UpgradeScene', { 
-                results: this.results, 
-                winner: this.winner,
-                winType: this.winType,
-                round: 1  // TODO: Track actual round number
-            });
+            
+            if (this.isFinalScreen) {
+                // Series is over, return to lobby
+                this.scene.start('LobbyScene');
+            } else {
+                // This shouldn't happen - EndScreen should only be shown at series end
+                // But as a fallback, go to lobby
+                this.scene.start('LobbyScene');
+            }
         });
 
         if (this.game.socket) {

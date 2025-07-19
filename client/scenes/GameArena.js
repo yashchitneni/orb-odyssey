@@ -566,7 +566,33 @@ class GameArenaScene extends Phaser.Scene {
 
         this.game.socket.on('gameEnded', (results) => {
             this.audioManager.stopGameplayMusic();
-            this.scene.start('EndScreenScene', { results: results.players, winner: results.winner, winType: results.winType, isPlayerWinner: results.winner === this.myId });
+            
+            // Check if series is over
+            if (results.isSeriesOver) {
+                // Go to final end screen
+                this.scene.start('EndScreenScene', { 
+                    results: results.players, 
+                    winner: results.seriesWinner || results.winner, 
+                    winType: results.winType, 
+                    isPlayerWinner: results.seriesWinner === this.myId || results.winner === this.myId,
+                    isFinalScreen: true,
+                    seriesScores: results.seriesScores
+                });
+            } else {
+                // Go to upgrade screen for next round
+                this.scene.start('UpgradeScene', { 
+                    results: results.players, 
+                    winner: results.winner,
+                    winType: results.winType,
+                    round: results.currentRound,
+                    seriesScores: results.seriesScores
+                });
+            }
+        });
+        
+        this.game.socket.on('nextRoundStart', (data) => {
+            // Re-initialize the scene for next round
+            this.scene.restart();
         });
 
         this.game.socket.on('warmupEnd', () => {
@@ -638,6 +664,11 @@ class GameArenaScene extends Phaser.Scene {
         if (data.gamePhase) {
             this.gamePhase = data.gamePhase;
             this.showGameStateIndicator(this.gamePhase);
+            
+            // Start countdown for warmup
+            if (data.gamePhase === 'warmup' && data.warmupTime) {
+                this.startWarmupCountdown(data.warmupTime);
+            }
         }
 
         // Update nebula core
@@ -1739,15 +1770,17 @@ class GameArenaScene extends Phaser.Scene {
         
         switch(state) {
             case 'warmup':
-                text = 'WARMUP';
-                color = GAME_CONSTANTS.UI.COLORS.WARNING;
-                break;
+                // Don't show static text for warmup - countdown will handle it
+                if (this.gameStateIndicator) {
+                    this.gameStateIndicator.destroy();
+                }
+                return;
             case 'playing':
-                text = 'PLAYING';
+                text = 'GO!';
                 color = GAME_CONSTANTS.UI.COLORS.SUCCESS;
                 break;
             case 'ended':
-                text = 'GAME ENDED';
+                text = 'ROUND ENDED';
                 color = GAME_CONSTANTS.UI.COLORS.DANGER;
                 break;
             default:
@@ -1758,13 +1791,28 @@ class GameArenaScene extends Phaser.Scene {
             this.gameStateIndicator.destroy();
         }
         
-        this.gameStateIndicator = this.add.text(400, 80, text, {
-            fontSize: '24px',
+        this.gameStateIndicator = this.add.text(400, 200, text, {
+            fontSize: '48px',
             fontWeight: 'bold',
             fill: color,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 3
+            strokeThickness: 4
         }).setOrigin(0.5);
+        
+        // Fade out "GO!" text after showing
+        if (state === 'playing') {
+            this.tweens.add({
+                targets: this.gameStateIndicator,
+                alpha: 0,
+                duration: 2000,
+                delay: 1000,
+                onComplete: () => {
+                    if (this.gameStateIndicator) {
+                        this.gameStateIndicator.destroy();
+                    }
+                }
+            });
+        }
         
         // Auto-hide after 3 seconds if not warmup
         if (state !== 'warmup') {
@@ -1779,6 +1827,54 @@ class GameArenaScene extends Phaser.Scene {
                 }
             });
         }
+    }
+    
+    startWarmupCountdown(warmupTime) {
+        // Clean up existing countdown
+        if (this.countdownText) {
+            this.countdownText.destroy();
+        }
+        if (this.countdownTimer) {
+            this.countdownTimer.destroy();
+        }
+        
+        // Create countdown display
+        this.countdownText = this.add.text(400, 200, 'Get Ready!', {
+            fontSize: '48px',
+            fontWeight: 'bold',
+            fill: GAME_CONSTANTS.UI.COLORS.WARNING,
+            stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
+            strokeThickness: 4
+        }).setOrigin(0.5);
+        
+        let timeLeft = Math.ceil(warmupTime / 1000);
+        
+        // Update countdown every second
+        this.countdownTimer = this.time.addEvent({
+            delay: 1000,
+            callback: () => {
+                timeLeft--;
+                
+                if (timeLeft > 3) {
+                    this.countdownText.setText('Get Ready!');
+                } else if (timeLeft > 0) {
+                    this.countdownText.setText(timeLeft.toString());
+                    // Add scale animation for countdown numbers
+                    this.tweens.add({
+                        targets: this.countdownText,
+                        scaleX: 1.2,
+                        scaleY: 1.2,
+                        duration: 200,
+                        yoyo: true
+                    });
+                } else {
+                    this.countdownText.destroy();
+                    this.countdownTimer.destroy();
+                }
+            },
+            callbackScope: this,
+            loop: true
+        });
     }
     
     updateConnectionStatus(connected) {

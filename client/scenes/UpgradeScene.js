@@ -10,6 +10,7 @@ class UpgradeScene extends Phaser.Scene {
         this.winType = data.winType || null;
         this.round = data.round || 1;
         this.playerUpgrades = data.playerUpgrades || {};
+        this.seriesScores = data.seriesScores || {};
     }
 
     create() {
@@ -45,6 +46,23 @@ class UpgradeScene extends Phaser.Scene {
                 fontWeight: 'bold'
             }).setOrigin(0.5);
         }
+        
+        // Show series scores
+        let scoresText = 'Series Scores: ';
+        Object.entries(this.seriesScores).forEach(([playerId, wins], index) => {
+            const player = this.results.find(p => p.id === playerId);
+            if (player) {
+                scoresText += `${player.name}: ${wins} wins`;
+                if (index < Object.keys(this.seriesScores).length - 1) {
+                    scoresText += ' | ';
+                }
+            }
+        });
+        
+        this.add.text(400, 180, scoresText, {
+            fontSize: '16px',
+            fill: '#88ddff'
+        }).setOrigin(0.5);
 
         // Upgrade selection title
         this.add.text(400, 220, 'Choose Your Upgrade', { 
@@ -198,7 +216,7 @@ class UpgradeScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         // Show some interesting stats from the round
-        const myStats = this.results.find(p => p.id === this.game.socket?.playerId);
+        const myStats = this.results.find(p => p.id === this.game.socket?.id);
         if (myStats) {
             const statsText = `Crystals: ${myStats.crystalsCollected}
 Level: ${myStats.level}
@@ -241,9 +259,16 @@ Score: ${myStats.score}`;
                 round: this.round
             });
             
-            // For now, go back to lobby
-            // In the future, this would start the next round directly
-            this.scene.start('LobbyScene');
+            // Wait for server to start next round
+            this.readyButton.setText('Waiting for other players...');
+            this.readyButton.setFill('#888888');
+            this.readyButton.disableInteractive();
+            
+            // Listen for next round start
+            this.game.socket.once('nextRoundStart', (data) => {
+                // Transition to game arena
+                this.scene.start('GameArenaScene');
+            });
         }
     }
 }

@@ -180,7 +180,13 @@ const gameState = {
         controlTime: 0
     },
     winner: null,
-    winType: null
+    winType: null,
+    // Multi-round tracking
+    currentRound: 0,
+    totalRounds: 5,
+    roundWinners: [],
+    playerUpgrades: {},
+    seriesScores: {} // Track wins per player
 };
 
 let playerIdCounter = 1;
@@ -254,6 +260,17 @@ function startGame() {
     gameState.nebulaCore.controllingPlayer = null;
     gameState.nebulaCore.controlStartTime = null;
     gameState.nebulaCore.controlTime = 0;
+    
+    // Initialize series if this is the first round
+    if (gameState.currentRound === 0) {
+        gameState.currentRound = 1;
+        gameState.roundWinners = [];
+        gameState.seriesScores = {};
+        for (const playerId in gameState.players) {
+            gameState.seriesScores[playerId] = 0;
+        }
+    }
+    
     initializeOrbs();
     initializeCrystals();
     
@@ -294,6 +311,12 @@ function endGame(winnerId = null, winType = null) {
     gameState.winner = winnerId;
     gameState.winType = winType;
     
+    // Track round winner
+    if (winnerId) {
+        gameState.roundWinners.push(winnerId);
+        gameState.seriesScores[winnerId] = (gameState.seriesScores[winnerId] || 0) + 1;
+    }
+    
     const playerResults = Object.values(gameState.players)
         .sort((a, b) => b.crystalsCollected - a.crystalsCollected)
         .map(player => ({
@@ -304,10 +327,19 @@ function endGame(winnerId = null, winType = null) {
             level: player.level
         }));
     
+    // Check if series is over (best of 5 - first to 3 wins)
+    const seriesWinner = Object.entries(gameState.seriesScores).find(([id, wins]) => wins >= 3);
+    const isSeriesOver = seriesWinner || gameState.currentRound >= gameState.totalRounds;
+    
     io.emit('gameEnded', {
         players: playerResults,
         winner: winnerId,
-        winType: winType
+        winType: winType,
+        currentRound: gameState.currentRound,
+        totalRounds: gameState.totalRounds,
+        seriesScores: gameState.seriesScores,
+        isSeriesOver: isSeriesOver,
+        seriesWinner: seriesWinner ? seriesWinner[0] : null
     });
     
     gameState.orbs = {};
@@ -990,6 +1022,21 @@ io.on('connection', (socket) => {
     });
     
     socket.on('returnToLobby', () => {
+        // Reset series tracking when returning to lobby
+        if (gameState.gamePhase === 'ended' && gameState.currentRound > 0) {
+            // Check if series is actually over
+            const seriesWinner = Object.entries(gameState.seriesScores).find(([id, wins]) => wins >= 3);
+            const isSeriesOver = seriesWinner || gameState.currentRound >= gameState.totalRounds;
+            
+            if (isSeriesOver) {
+                // Reset series tracking for new game
+                gameState.currentRound = 0;
+                gameState.roundWinners = [];
+                gameState.playerUpgrades = {};
+                gameState.seriesScores = {};
+            }
+        }
+        
         const playerList = Object.values(gameState.players).map(p => ({
             id: p.id,
             name: p.name
@@ -999,7 +1046,61 @@ io.on('connection', (socket) => {
     
     socket.on('selectUpgrade', (data) => {
         console.log(`Player ${socket.playerId} selected upgrade: ${data.upgradeId} for round ${data.round}`);
-        // TODO: Store upgrade selections for multi-round gameplay
+        
+        // Store player's upgrade
+        if (!gameState.playerUpgrades[socket.playerId]) {
+            gameState.playerUpgrades[socket.playerId] = [];
+        }
+        gameState.playerUpgrades[socket.playerId].push({
+            upgradeId: data.upgradeId,
+            round: gameState.currentRound
+        });
+        
+        // Apply upgrade effects
+        const player = gameState.players[socket.playerId];
+        if (player) {
+            switch(data.upgradeId) {
+                case 'kinetic_plating':
+                    // Reduce crystal drops on collision
+                    player.crystalDropReduction = (player.crystalDropReduction || 0) + 2;
+                    break;
+                case 'warp_coil':
+                    // Increase movement speed
+                    player.speedMultiplier = (player.speedMultiplier || 1) * 1.15;
+                    break;
+                case 'efficiency_matrix':
+                    // Reduce ability energy cost
+                    player.energyCostReduction = (player.energyCostReduction || 0) + 0.2;
+                    break;
+            }
+        }
+        
+        // Check if all players have selected upgrades
+        const activePlayers = Object.keys(gameState.players).length;
+        const playersWithUpgrades = Object.keys(gameState.playerUpgrades)
+            .filter(id => gameState.playerUpgrades[id].some(u => u.round === gameState.currentRound))
+            .length;
+        
+        if (playersWithUpgrades >= activePlayers) {
+            // All players ready, start next round
+            startNextRound();
+        }
+    });
+    
+    socket.on('readyForNextRound', () => {
+        // Mark player as ready for next round
+        if (!gameState.playersReady) {
+            gameState.playersReady = {};
+        }
+        gameState.playersReady[socket.playerId] = true;
+        
+        // Check if all players are ready
+        const activePlayers = Object.keys(gameState.players).length;
+        const readyPlayers = Object.keys(gameState.playersReady).length;
+        
+        if (readyPlayers >= activePlayers) {
+            startNextRound();
+        }
     });
     
     socket.on('disconnect', () => {
@@ -1077,6 +1178,59 @@ function checkWinConditions() {
     // Crystal win condition is checked when crystals are collected
     // Nebula Core win is checked in checkNebulaControl
     // Time limit is checked in updateGame
+}
+
+function startNextRound() {
+    gameState.currentRound++;
+    gameState.playersReady = {};
+    
+    // Reset round-specific state but keep upgrades
+    gameState.gameStarted = true;
+    gameState.gamePhase = 'warmup';
+    gameState.warmupTime = 3000; // Shorter warmup for subsequent rounds
+    gameState.gameTime = GAME_CONSTANTS.WIN_CONDITIONS.GAME_DURATION;
+    gameState.winner = null;
+    gameState.winType = null;
+    gameState.nebulaCore.controllingPlayer = null;
+    gameState.nebulaCore.controlStartTime = null;
+    gameState.nebulaCore.controlTime = 0;
+    
+    // Clear old game objects
+    gameState.orbs = {};
+    gameState.crystals = {};
+    
+    // Respawn game objects
+    initializeOrbs();
+    initializeCrystals();
+    
+    // Reset player positions and round-specific stats
+    for (const playerId in gameState.players) {
+        const player = gameState.players[playerId];
+        player.score = 0;
+        player.crystalsCollected = 0;
+        player.level = 1;
+        player.energy = GAME_CONSTANTS.ENERGY.MAX;
+        player.energyRegenTimer = 0;
+        player.walls = [];
+        player.collisionImmunity = 0;
+        player.x = Math.random() * GAME_CONSTANTS.WORLD_WIDTH;
+        player.y = Math.random() * GAME_CONSTANTS.WORLD_HEIGHT;
+        player.vx = 0;
+        player.vy = 0;
+        
+        // Keep upgrade effects active
+        player.abilities.burst.available = false;
+        player.abilities.burst.cooldown = 0;
+        player.abilities.wall.available = false;
+        player.abilities.wall.cooldown = 0;
+    }
+    
+    // Notify all players that next round is starting
+    io.emit('nextRoundStart', {
+        currentRound: gameState.currentRound,
+        totalRounds: gameState.totalRounds,
+        seriesScores: gameState.seriesScores
+    });
 }
 
 // Global error handlers to prevent server crashes
