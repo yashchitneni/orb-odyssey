@@ -87,6 +87,14 @@ class Preloader extends BaseScene {
             console.log('[PRELOADER] orb3.png loaded successfully!');
         });
         
+        // Load crystal sprite
+        console.log('[PRELOADER] Loading crystal sprite...');
+        this.load.image('crystal', 'assets/sprites/crystal.png');
+        
+        this.load.on('filecomplete-image-crystal', () => {
+            console.log('[PRELOADER] crystal.png loaded successfully!');
+        });
+        
         // Since we don't have actual asset files, we'll create placeholders
         // In production, you would load actual sprite files here
         
@@ -105,7 +113,9 @@ class Preloader extends BaseScene {
         orbGraphics.generateTexture('orb', 32, 32);
         orbGraphics.destroy();
         
-        // Create placeholder crystal sprite
+        // Don't create placeholder crystal if we're loading the actual image
+        // This was overriding the loaded crystal.png
+        /*
         const crystalGraphics = this.add.graphics();
         crystalGraphics.fillStyle(0x00ffff);
         crystalGraphics.beginPath();
@@ -118,6 +128,7 @@ class Preloader extends BaseScene {
         crystalGraphics.fillPath();
         crystalGraphics.generateTexture('crystal', 32, 32);
         crystalGraphics.destroy();
+        */
         
         // Create placeholder particle sprite
         const particleGraphics = this.add.graphics();

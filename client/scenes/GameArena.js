@@ -900,17 +900,41 @@ class GameArenaScene extends BaseScene {
 
         const color = crystalData.isPowerCrystal ? 0xff00ff : 0x00ffff;
         
-        const crystal = this.add.sprite(crystalData.x, crystalData.y, 'crystal');
-        crystal.setTint(color);
+        let crystal;
+        
+        // Try to use the crystal sprite image, fall back to generated shape if not loaded
+        if (this.textures.exists('crystal')) {
+            console.log(`[GameArena] Creating crystal ${crystalId} with sprite image`);
+            crystal = this.add.sprite(crystalData.x, crystalData.y, 'crystal');
+            crystal.setTint(color);
+            
+            // Scale the sprite image - increased for better visibility
+            const scale = crystalData.isPowerCrystal ? 0.12 : 0.1;
+            crystal.setScale(scale);
+        } else {
+            console.log(`[GameArena] Crystal sprite not found, using fallback shape for crystal ${crystalId}`);
+            // Fallback to diamond shape
+            const size = crystalData.isPowerCrystal ? ScaleHelper.scale(12) : ScaleHelper.scale(10);
+            crystal = this.add.graphics();
+            crystal.fillStyle(color);
+            crystal.beginPath();
+            crystal.moveTo(0, -size);
+            crystal.lineTo(size * 0.6, 0);
+            crystal.lineTo(0, size);
+            crystal.lineTo(-size * 0.6, 0);
+            crystal.closePath();
+            crystal.fillPath();
+            crystal.x = crystalData.x;
+            crystal.y = crystalData.y;
+        }
+        
         crystal.setOrigin(0.5);
-
-        const scale = crystalData.isPowerCrystal ? 0.4 : 0.3;  // Reduced from 0.6/0.5
-        crystal.setScale(scale);
         
         // Pulsing effect
+        const currentScale = crystal.scale || 1;
         this.tweens.add({
             targets: crystal,
-            scale: crystal.scale * 1.05,  // Reduced from 1.1 for subtler pulse
+            scale: currentScale * 1.05,  // Reduced from 1.1 for subtler pulse
             alpha: 0.7,
             duration: crystalData.isPowerCrystal ? 800 : 1200,
             yoyo: true,
