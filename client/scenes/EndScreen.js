@@ -1,4 +1,4 @@
-class EndScreenScene extends Phaser.Scene {
+class EndScreenScene extends BaseScene {
     constructor() {
         super({ key: 'EndScreenScene' });
         this.audioManager = null;
@@ -26,12 +26,12 @@ class EndScreenScene extends Phaser.Scene {
             this.audioManager.playMusic('DEFEAT');
         }
         // Background
-        this.add.rectangle(400, 300, 800, 600, 0x000033);
+        this.add.rectangle(ScaleHelper.centerX(), ScaleHelper.centerY(), ScaleHelper.width(), ScaleHelper.height(), 0x000033);
         
         // Victory title based on win type and whether it's final
         const titleText = this.isFinalScreen ? 'SERIES COMPLETE!' : this.getVictoryTitle();
-        this.add.text(400, 60, titleText, { 
-            fontSize: '48px', 
+        this.add.text(ScaleHelper.centerX(), ScaleHelper.y(60), titleText, { 
+            fontSize: ScaleHelper.font('48px'), 
             fill: '#fff',
             fontWeight: 'bold',
             stroke: '#000',
@@ -43,8 +43,8 @@ class EndScreenScene extends Phaser.Scene {
             const winnerData = this.results.find(p => p.id === this.winner);
             if (winnerData) {
                 const winText = this.getWinnerText(winnerData);
-                this.add.text(400, 120, winText, { 
-                    fontSize: '36px', 
+                this.add.text(ScaleHelper.centerX(), ScaleHelper.y(120), winText, { 
+                    fontSize: ScaleHelper.font('36px'), 
                     fill: '#ffd700',
                     fontWeight: 'bold'
                 }).setOrigin(0.5);
@@ -53,24 +53,24 @@ class EndScreenScene extends Phaser.Scene {
         
         // Story wrap-up
         const storyText = this.getStoryWrapUp();
-        this.add.text(400, 170, storyText, { 
-            fontSize: '18px', 
+        this.add.text(ScaleHelper.centerX(), ScaleHelper.y(170), storyText, { 
+            fontSize: ScaleHelper.font('18px'), 
             fill: '#aaa',
             align: 'center',
-            wordWrap: { width: 600 }
+            wordWrap: { width: ScaleHelper.x(600) }
         }).setOrigin(0.5);
 
         // Show series scores if it's the final screen
-        let yPos = 230;
+        let yPos = ScaleHelper.y(230);
         if (this.isFinalScreen && this.seriesScores) {
-            let scoresY = 200;
-            this.add.text(400, scoresY, 'Series Results:', { 
-                fontSize: '32px', 
+            let scoresY = ScaleHelper.y(200);
+            this.add.text(ScaleHelper.centerX(), scoresY, 'Series Results:', { 
+                fontSize: ScaleHelper.font('32px'), 
                 fill: '#fff',
                 fontWeight: 'bold'
             }).setOrigin(0.5);
             
-            scoresY += 40;
+            scoresY += ScaleHelper.y(40);
             const sortedScores = Object.entries(this.seriesScores).sort((a, b) => b[1] - a[1]);
             
             sortedScores.forEach(([playerId, wins], index) => {
@@ -79,45 +79,45 @@ class EndScreenScene extends Phaser.Scene {
                     const medal = index === 0 ? '🏆' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
                     const text = `${medal} ${player.name}: ${wins} rounds won`;
                     
-                    this.add.text(400, scoresY, text, { 
-                        fontSize: '24px', 
+                    this.add.text(ScaleHelper.centerX(), scoresY, text, { 
+                        fontSize: ScaleHelper.font('24px'), 
                         fill: index === 0 ? '#ffd700' : '#fff',
                         fontWeight: index === 0 ? 'bold' : 'normal'
                     }).setOrigin(0.5);
                     
-                    scoresY += 35;
+                    scoresY += ScaleHelper.y(35);
                 }
             });
             
-            scoresY += 20;
+            scoresY += ScaleHelper.y(20);
             yPos = scoresY;
         }
         
-        this.add.text(400, yPos, this.isFinalScreen ? 'Round Stats:' : 'Final Results:', { 
-            fontSize: '28px', 
+        this.add.text(ScaleHelper.centerX(), yPos, this.isFinalScreen ? 'Stats from Final Round:' : 'Final Results:', {
+            fontSize: ScaleHelper.font('28px'), 
             fill: '#fff' 
         }).setOrigin(0.5);
 
-        yPos = yPos + 50;
+        yPos = yPos + ScaleHelper.y(50);
         this.results.forEach((player, index) => {
             const isWinner = player.id === this.winner;
             const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
             const text = `${medal} ${player.name}: ${player.crystalsCollected} crystals (Level ${player.level})`;
             
-            this.add.text(400, yPos, text, { 
-                fontSize: '24px', 
+            this.add.text(ScaleHelper.centerX(), yPos, text, { 
+                fontSize: ScaleHelper.font('24px'), 
                 fill: isWinner ? '#ffd700' : '#fff',
                 fontWeight: isWinner ? 'bold' : 'normal'
             }).setOrigin(0.5);
             
-            yPos += 35;
+            yPos += ScaleHelper.y(35);
         });
 
-        const playAgainButton = this.add.text(400, 500, 'Play Again', { 
-            fontSize: '32px', 
+        const playAgainButton = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(500), 'Play Again', { 
+            fontSize: ScaleHelper.font('32px'), 
             fill: '#0f0',
             backgroundColor: '#333',
-            padding: { x: 20, y: 10 }
+            padding: { x: ScaleHelper.scale(20), y: ScaleHelper.scale(10) }
         }).setOrigin(0.5);
 
         playAgainButton.setInteractive();

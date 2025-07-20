@@ -1,4 +1,4 @@
-class Preloader extends Phaser.Scene {
+class Preloader extends BaseScene {
     constructor() {
         super({ key: 'Preloader' });
     }
@@ -6,29 +6,29 @@ class Preloader extends Phaser.Scene {
     preload() {
         console.log('Preloading assets...');
 
-        // Display loading bar
+        // Display loading bar (for 1200x800)
         let progressBar = this.add.graphics();
         let progressBox = this.add.graphics();
         progressBox.fillStyle(0x222222, 0.8);
-        progressBox.fillRect(240, 270, 320, 50);
+        progressBox.fillRect(ScaleHelper.x(240), ScaleHelper.y(225), ScaleHelper.x(320), ScaleHelper.y(50));
 
         let loadingText = this.make.text({
-            x: 400,
-            y: 250,
+            x: ScaleHelper.centerX(),
+            y: ScaleHelper.y(210),
             text: 'Loading...',
             style: {
-                font: '20px monospace',
+                font: ScaleHelper.font('20px') + ' monospace',
                 fill: '#ffffff'
             }
         });
         loadingText.setOrigin(0.5, 0.5);
 
         let percentText = this.make.text({
-            x: 400,
-            y: 295,
+            x: ScaleHelper.centerX(),
+            y: ScaleHelper.y(250),
             text: '0%',
             style: {
-                font: '18px monospace',
+                font: ScaleHelper.font('18px') + ' monospace',
                 fill: '#ffffff'
             }
         });
@@ -38,7 +38,7 @@ class Preloader extends Phaser.Scene {
             percentText.setText(parseInt(value * 100) + '%');
             progressBar.clear();
             progressBar.fillStyle(0xffffff, 1);
-            progressBar.fillRect(250, 280, 300 * value, 30);
+            progressBar.fillRect(ScaleHelper.x(250), ScaleHelper.y(235), ScaleHelper.x(300) * value, ScaleHelper.y(30));
         });
 
         this.load.on('complete', () => {
@@ -51,6 +51,10 @@ class Preloader extends Phaser.Scene {
             this.scene.start('MainMenuScene');
         });
 
+        // Load actual assets if available
+        // Check if nebula image exists in assets folder
+        this.load.image('nebula', 'assets/nebula.png');
+        
         // Since we don't have actual asset files, we'll create placeholders
         // In production, you would load actual sprite files here
         

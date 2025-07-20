@@ -1,12 +1,13 @@
 const config = {
     type: Phaser.AUTO,
-    width: 800,
-    height: 600,
+    width: 1200,
+    height: 800,
     parent: 'game-container',
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
+    backgroundColor: '#000000',
     physics: {
         default: 'arcade',
         arcade: {
@@ -14,7 +15,19 @@ const config = {
             debug: false
         }
     },
-    scene: [Preloader, MainMenuScene, LobbyScene, GameArenaScene, EndScreenScene, UpgradeScene]
+    scene: [Preloader, MainMenuScene, LobbyScene, GameArenaScene, EndScreenScene, UpgradeScene],
+    callbacks: {
+        postBoot: function (game) {
+            // Add global border effect to all scenes
+            game.scene.scenes.forEach(scene => {
+                scene.events.on('create', function() {
+                    if (scene.createViewportBorder) {
+                        scene.createViewportBorder();
+                    }
+                });
+            });
+        }
+    }
 };
 
 const game = new Phaser.Game(config);

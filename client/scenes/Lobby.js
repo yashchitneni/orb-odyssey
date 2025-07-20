@@ -1,4 +1,4 @@
-class LobbyScene extends Phaser.Scene {
+class LobbyScene extends BaseScene {
     constructor() {
         super({ key: 'LobbyScene' });
         this.players = [];
@@ -89,7 +89,7 @@ class LobbyScene extends Phaser.Scene {
         // Enhanced gradient background
         const bg = this.add.graphics();
         bg.fillGradientStyle(0x000033, 0x001144, 0x000022, 0x002244);
-        bg.fillRect(0, 0, 800, 600);
+        bg.fillRect(0, 0, ScaleHelper.width(), ScaleHelper.height());
         
         // Enhanced starfield background with multiple layers
         this.createMultiLayerStarfield();
@@ -108,9 +108,9 @@ class LobbyScene extends Phaser.Scene {
         // Background stars (small, slow)
         for (let i = 0; i < starConfig.COUNT * 0.7; i++) {
             const star = this.add.circle(
-                Phaser.Math.Between(0, 800),
-                Phaser.Math.Between(0, 600),
-                Phaser.Math.FloatBetween(0.5, 1.5),
+                Phaser.Math.Between(0, ScaleHelper.width()),
+                Phaser.Math.Between(0, ScaleHelper.height()),
+                Phaser.Math.FloatBetween(0.5, 1.5) * ScaleHelper.scale(1),
                 0xffffff,
                 Phaser.Math.FloatBetween(0.2, 0.6)
             );
@@ -130,9 +130,9 @@ class LobbyScene extends Phaser.Scene {
         // Foreground stars (larger, faster)
         for (let i = 0; i < starConfig.COUNT * 0.3; i++) {
             const star = this.add.circle(
-                Phaser.Math.Between(0, 800),
-                Phaser.Math.Between(0, 600),
-                Phaser.Math.FloatBetween(2, 4),
+                Phaser.Math.Between(0, ScaleHelper.width()),
+                Phaser.Math.Between(0, ScaleHelper.height()),
+                Phaser.Math.FloatBetween(2, 4) * ScaleHelper.scale(1),
                 0xffffff,
                 Phaser.Math.FloatBetween(0.4, 0.9)
             );
@@ -156,17 +156,17 @@ class LobbyScene extends Phaser.Scene {
         
         for (let i = 0; i < nebulaConfig.COUNT * 0.5; i++) {
             const particle = this.add.circle(
-                Phaser.Math.Between(0, 800),
-                Phaser.Math.Between(0, 600),
-                Phaser.Math.Between(2, 8),
+                Phaser.Math.Between(0, ScaleHelper.width()),
+                Phaser.Math.Between(0, ScaleHelper.height()),
+                Phaser.Math.Between(2, 8) * ScaleHelper.scale(1),
                 Phaser.Utils.Array.GetRandom([0x4400ff, 0x6600ff, 0x8800ff]),
                 Phaser.Math.FloatBetween(0.1, 0.3)
             );
             
             // Add flowing movement
             particle.velocity = {
-                x: Phaser.Math.FloatBetween(-20, 20),
-                y: Phaser.Math.FloatBetween(-30, 30)
+                x: Phaser.Math.FloatBetween(-20, 20) * ScaleHelper.scale(1),
+                y: Phaser.Math.FloatBetween(-30, 30) * ScaleHelper.scale(1)
             };
             
             // Add pulsing animation
@@ -192,15 +192,15 @@ class LobbyScene extends Phaser.Scene {
         gridGraphics.lineStyle(1, 0x004488, 0.1);
         
         // Vertical lines
-        for (let x = 0; x <= 800; x += 80) {
+        for (let x = 0; x <= ScaleHelper.width(); x += ScaleHelper.x(80)) {
             gridGraphics.moveTo(x, 0);
-            gridGraphics.lineTo(x, 600);
+            gridGraphics.lineTo(x, ScaleHelper.height());
         }
         
         // Horizontal lines
-        for (let y = 0; y <= 600; y += 60) {
+        for (let y = 0; y <= ScaleHelper.height(); y += ScaleHelper.y(60)) {
             gridGraphics.moveTo(0, y);
-            gridGraphics.lineTo(800, y);
+            gridGraphics.lineTo(ScaleHelper.width(), y);
         }
         
         gridGraphics.strokePath();
@@ -218,16 +218,18 @@ class LobbyScene extends Phaser.Scene {
     
     createTitle() {
         // Main title
-        this.titleText = this.add.text(400, 80, 'ORB ODYSSEY', {
-            ...GAME_CONSTANTS.UI.FONTS.TITLE,
+        this.titleText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(80), 'ORB ODYSSEY', {
+            fontSize: ScaleHelper.font(GAME_CONSTANTS.UI.FONTS.TITLE.fontSize),
+            fontFamily: GAME_CONSTANTS.UI.FONTS.TITLE.fontFamily,
             fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
             strokeThickness: 4
         }).setOrigin(0.5);
         
         // Title glow effect
-        this.titleGlow = this.add.text(400, 100, 'ORB ODYSSEY', {
-            ...GAME_CONSTANTS.UI.FONTS.TITLE,
+        this.titleGlow = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(100), 'ORB ODYSSEY', {
+            fontSize: ScaleHelper.font(GAME_CONSTANTS.UI.FONTS.TITLE.fontSize),
+            fontFamily: GAME_CONSTANTS.UI.FONTS.TITLE.fontFamily,
             fill: GAME_CONSTANTS.UI.COLORS.GLOW,
             alpha: 0.5
         }).setOrigin(0.5);
@@ -244,15 +246,16 @@ class LobbyScene extends Phaser.Scene {
         });
         
         // Subtitle
-        this.add.text(400, 130, 'Multiplayer Crystal Collection Arena', {
-            ...GAME_CONSTANTS.UI.FONTS.SUBTITLE,
+        this.add.text(ScaleHelper.centerX(), ScaleHelper.y(130), 'Multiplayer Crystal Collection Arena', {
+            fontSize: ScaleHelper.font(GAME_CONSTANTS.UI.FONTS.SUBTITLE.fontSize),
+            fontFamily: GAME_CONSTANTS.UI.FONTS.SUBTITLE.fontFamily,
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
             fontStyle: 'italic'
         }).setOrigin(0.5);
         
         // Room ID
-        this.add.text(400, 160, `Room: ${this.roomId}`, {
-            fontSize: '20px',
+        this.add.text(ScaleHelper.centerX(), ScaleHelper.y(160), `Room: ${this.roomId}`, {
+            fontSize: ScaleHelper.font('20px'),
             fill: '#ffff00',
             fontWeight: 'bold'
         }).setOrigin(0.5);
@@ -262,13 +265,14 @@ class LobbyScene extends Phaser.Scene {
         // Status panel background
         this.statusPanel = this.add.graphics();
         this.statusPanel.fillGradientStyle(0x2a2a2a, 0x2a2a2a, 0x1a1a1a, 0x1a1a1a);
-        this.statusPanel.fillRoundedRect(250, 180, 300, 60, 12);
+        this.statusPanel.fillRoundedRect(ScaleHelper.x(250), ScaleHelper.y(180), ScaleHelper.x(300), ScaleHelper.y(60), 12);
         this.statusPanel.lineStyle(2, 0x00ffff);
-        this.statusPanel.strokeRoundedRect(250, 180, 300, 60, 12);
+        this.statusPanel.strokeRoundedRect(ScaleHelper.x(250), ScaleHelper.y(180), ScaleHelper.x(300), ScaleHelper.y(60), 12);
         
         // Status text
-        this.statusText = this.add.text(400, 210, 'Waiting for players...', {
-            ...GAME_CONSTANTS.UI.FONTS.BODY,
+        this.statusText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(210), 'Waiting for players...', {
+            fontSize: ScaleHelper.font(GAME_CONSTANTS.UI.FONTS.BODY.fontSize),
+            fontFamily: GAME_CONSTANTS.UI.FONTS.BODY.fontFamily,
             fill: GAME_CONSTANTS.UI.COLORS.WARNING
         }).setOrigin(0.5);
         
@@ -295,33 +299,33 @@ class LobbyScene extends Phaser.Scene {
         // Player list panel background
         this.playerPanel = this.add.graphics();
         this.playerPanel.fillStyle(0x1a1a1a, 0.9);
-        this.playerPanel.fillRoundedRect(200, 260, 400, 200, 12);
+        this.playerPanel.fillRoundedRect(ScaleHelper.x(200), ScaleHelper.y(260), ScaleHelper.x(400), ScaleHelper.y(200), 12);
         this.playerPanel.lineStyle(2, 0xff00ff);
-        this.playerPanel.strokeRoundedRect(200, 260, 400, 200, 12);
+        this.playerPanel.strokeRoundedRect(ScaleHelper.x(200), ScaleHelper.y(260), ScaleHelper.x(400), ScaleHelper.y(200), 12);
         
         // Panel title
-        this.add.text(400, 280, 'PLAYERS IN LOBBY', {
-            fontSize: '20px',
+        this.add.text(ScaleHelper.centerX(), ScaleHelper.y(280), 'PLAYERS IN LOBBY', {
+            fontSize: ScaleHelper.font('20px'),
             fontWeight: 'bold',
             fill: GAME_CONSTANTS.UI.COLORS.SECONDARY
         }).setOrigin(0.5);
         
         // Player list container
-        this.playerListContainer = this.add.container(220, 310);
+        this.playerListContainer = this.add.container(ScaleHelper.x(220), ScaleHelper.y(310));
         
         // Column headers
-        this.add.text(220, 300, 'Player', {
-            fontSize: '16px',
+        this.add.text(ScaleHelper.x(220), ScaleHelper.y(300), 'Player', {
+            fontSize: ScaleHelper.font('16px'),
             fontWeight: 'bold',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE
         });
-        this.add.text(450, 300, 'Status', {
-            fontSize: '16px',
+        this.add.text(ScaleHelper.x(450), ScaleHelper.y(300), 'Status', {
+            fontSize: ScaleHelper.font('16px'),
             fontWeight: 'bold',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE
         });
-        this.add.text(550, 300, 'Ready', {
-            fontSize: '16px',
+        this.add.text(ScaleHelper.x(550), ScaleHelper.y(300), 'Ready', {
+            fontSize: ScaleHelper.font('16px'),
             fontWeight: 'bold',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE
         });
@@ -331,13 +335,13 @@ class LobbyScene extends Phaser.Scene {
         // Start button background
         this.startButtonBg = this.add.graphics();
         this.startButtonBg.fillGradientStyle(0x00ff00, 0x00aa00, 0x008800, 0x004400);
-        this.startButtonBg.fillRoundedRect(300, 480, 200, 60, 16);
+        this.startButtonBg.fillRoundedRect(ScaleHelper.x(300), ScaleHelper.y(480), ScaleHelper.x(200), ScaleHelper.y(60), 16);
         this.startButtonBg.lineStyle(3, 0x00ffff);
-        this.startButtonBg.strokeRoundedRect(300, 480, 200, 60, 16);
+        this.startButtonBg.strokeRoundedRect(ScaleHelper.x(300), ScaleHelper.y(480), ScaleHelper.x(200), ScaleHelper.y(60), 16);
         
         // Start button text
-        this.startButtonText = this.add.text(400, 510, 'START GAME', {
-            fontSize: '24px',
+        this.startButtonText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(510), 'START GAME', {
+            fontSize: ScaleHelper.font('24px'),
             fontFamily: 'Arial Black',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
@@ -345,7 +349,7 @@ class LobbyScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         // Make button interactive
-        this.startButtonBg.setInteractive(new Phaser.Geom.Rectangle(300, 480, 200, 60), Phaser.Geom.Rectangle.Contains);
+        this.startButtonBg.setInteractive(new Phaser.Geom.Rectangle(ScaleHelper.x(300), ScaleHelper.y(480), ScaleHelper.x(200), ScaleHelper.y(60)), Phaser.Geom.Rectangle.Contains);
         this.startButtonText.setInteractive();
         
         // Button hover effects
@@ -390,7 +394,7 @@ class LobbyScene extends Phaser.Scene {
         // Pulsing glow effect when ready
         this.startButtonGlow = this.add.graphics();
         this.startButtonGlow.fillStyle(0x00ff00, 0.3);
-        this.startButtonGlow.fillRoundedRect(295, 475, 210, 70, 20);
+        this.startButtonGlow.fillRoundedRect(ScaleHelper.x(295), ScaleHelper.y(475), ScaleHelper.x(210), ScaleHelper.y(70), 20);
         this.startButtonGlow.setVisible(false);
         
         this.tweens.add({
@@ -406,9 +410,9 @@ class LobbyScene extends Phaser.Scene {
         // Game info panel
         this.infoPanel = this.add.graphics();
         this.infoPanel.fillStyle(0x1a1a1a, 0.8);
-        this.infoPanel.fillRoundedRect(50, 320, 120, 200, 8);
+        this.infoPanel.fillRoundedRect(ScaleHelper.x(50), ScaleHelper.y(320), ScaleHelper.x(120), ScaleHelper.y(200), 8);
         this.infoPanel.lineStyle(1, 0x555555);
-        this.infoPanel.strokeRoundedRect(50, 320, 120, 200, 8);
+        this.infoPanel.strokeRoundedRect(ScaleHelper.x(50), ScaleHelper.y(320), ScaleHelper.x(120), ScaleHelper.y(200), 8);
         
         // Game rules text
         const rulesText = `GAME RULES:
@@ -424,16 +428,16 @@ WASD - Move
 Q - Burst (L3+)
 E - Wall (L4+)`;
         
-        this.add.text(60, 330, rulesText, {
-            fontSize: '11px',
+        this.add.text(ScaleHelper.x(60), ScaleHelper.y(330), rulesText, {
+            fontSize: ScaleHelper.font('11px'),
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
             lineSpacing: 3,
-            wordWrap: { width: 100 }
+            wordWrap: { width: ScaleHelper.x(100) }
         });
         
         // Connection status
-        this.connectionStatus = this.add.text(60, 540, '● Connected', {
-            fontSize: '12px',
+        this.connectionStatus = this.add.text(ScaleHelper.x(60), ScaleHelper.y(540), '● Connected', {
+            fontSize: ScaleHelper.font('12px'),
             fill: GAME_CONSTANTS.UI.COLORS.SUCCESS
         });
         
@@ -442,8 +446,8 @@ E - Wall (L4+)`;
     }
     
     createBackButton() {
-        const backButton = this.add.text(700, 30, '← Back to Menu', {
-            fontSize: '16px',
+        const backButton = this.add.text(ScaleHelper.x(700), ScaleHelper.y(30), '← Back to Menu', {
+            fontSize: ScaleHelper.font('16px'),
             fill: '#ffff00',
             backgroundColor: '#333300',
             padding: { x: 10, y: 5 }
@@ -471,6 +475,9 @@ E - Wall (L4+)`;
     }
 
     updatePlayerList(players) {
+        if (!this.scene.isActive()) {
+            return;
+        }
         this.players = players;
         
         if (this.playerListContainer) {
@@ -479,29 +486,29 @@ E - Wall (L4+)`;
             
             // Add players with enhanced display
             players.forEach((player, index) => {
-                const yPos = index * 30;
+                const yPos = index * ScaleHelper.y(30);
                 
                 // Player indicator circle
-                const indicator = this.add.circle(0, yPos + 10, 8, player.color || 0x00ff00);
+                const indicator = this.add.circle(0, yPos + ScaleHelper.y(10), ScaleHelper.scale(8), player.color || 0x00ff00);
                 
                 // Player name with host indicator
                 const isHost = index === 0; // First player in list is the host
                 const namePrefix = isHost ? '👑 ' : '';
-                const nameText = this.add.text(20, yPos, namePrefix + (player.name || `Player ${index + 1}`), {
-                    fontSize: '16px',
+                const nameText = this.add.text(ScaleHelper.x(20), yPos, namePrefix + (player.name || `Player ${index + 1}`), {
+                    fontSize: ScaleHelper.font('16px'),
                     fill: isHost ? '#ffd700' : GAME_CONSTANTS.UI.COLORS.WHITE,
                     fontWeight: 'bold'
                 });
                 
                 // Player status
-                const statusText = this.add.text(230, yPos, 'Connected', {
-                    fontSize: '14px',
+                const statusText = this.add.text(ScaleHelper.x(230), yPos, 'Connected', {
+                    fontSize: ScaleHelper.font('14px'),
                     fill: GAME_CONSTANTS.UI.COLORS.SUCCESS
                 });
                 
                 // Ready indicator
-                const readyIndicator = this.add.text(330, yPos, '✓', {
-                    fontSize: '16px',
+                const readyIndicator = this.add.text(ScaleHelper.x(330), yPos, '✓', {
+                    fontSize: ScaleHelper.font('16px'),
                     fill: GAME_CONSTANTS.UI.COLORS.SUCCESS
                 });
                 
@@ -548,7 +555,7 @@ E - Wall (L4+)`;
             }
             
             // Update status text
-            if (canInteract && players.length >= 2) {
+            if (canInteract) {
                 this.statusText.setText('Ready to start!');
                 this.statusText.setFill(GAME_CONSTANTS.UI.COLORS.SUCCESS);
                 this.waitingTimer?.destroy();
@@ -589,10 +596,10 @@ E - Wall (L4+)`;
                 particle.y += particle.velocity.y * deltaTime;
                 
                 // Wrap around screen
-                if (particle.x < -20) particle.x = 820;
-                if (particle.x > 820) particle.x = -20;
-                if (particle.y < -20) particle.y = 620;
-                if (particle.y > 620) particle.y = -20;
+                if (particle.x < -20) particle.x = ScaleHelper.width() + 20;
+                if (particle.x > ScaleHelper.width() + 20) particle.x = -20;
+                if (particle.y < -20) particle.y = ScaleHelper.height() + 20;
+                if (particle.y > ScaleHelper.height() + 20) particle.y = -20;
             });
         }
     }

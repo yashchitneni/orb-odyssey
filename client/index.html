@@ -9,14 +9,41 @@
             margin: 0;
             padding: 0;
             width: 100%;
-            height: 100%;
+            height: 100vh;
             overflow: hidden;
-            background-color: #1a1a1a;
+            background: radial-gradient(circle at center, #0a0a1a 0%, #000000 100%);
             font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
         #game-container {
-            width: 100%;
-            height: 100%;
+            position: relative;
+            box-shadow: 
+                0 0 50px rgba(0, 255, 255, 0.5),
+                inset 0 0 20px rgba(0, 255, 255, 0.2);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            background: #000000;
+        }
+        #game-container::before {
+            content: '';
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            right: -10px;
+            bottom: -10px;
+            background: linear-gradient(45deg, 
+                transparent 30%, 
+                rgba(0, 255, 255, 0.1) 50%, 
+                transparent 70%);
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+            z-index: 1;
+        }
+        @keyframes scanline {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
         }
     </style>
 </head>
@@ -25,8 +52,10 @@
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
     <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="/shared/constants.js"></script>
+    <script src="utils/scaleHelper.js"></script>
     <script src="AudioManager.js"></script>
     <script src="AudioSettingsPanel.js"></script>
+    <script src="scenes/BaseScene.js"></script>
     <script src="scenes/Preloader.js"></script>
     <script src="scenes/MainMenu.js"></script>
     <script src="scenes/Lobby.js"></script>

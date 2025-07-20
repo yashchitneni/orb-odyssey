@@ -222,7 +222,8 @@ class Room {
             totalRounds: 5,
             roundWinners: [],
             playerUpgrades: {},
-            seriesScores: {}
+            seriesScores: {},
+            playersReady: {}
         };
     }
     
@@ -416,9 +417,10 @@ class Room {
             }
         }
         
-        // Apply drag
-        player.vx *= Math.pow(GAME_CONSTANTS.PLAYER_DRAG, deltaTime * 60);
-        player.vy *= Math.pow(GAME_CONSTANTS.PLAYER_DRAG, deltaTime * 60);
+        // Apply drag (with curse modifier)
+        const drag = GAME_CONSTANTS.PLAYER_DRAG * (player.dragModifier || 1);
+        player.vx *= Math.pow(drag, deltaTime * 60);
+        player.vy *= Math.pow(drag, deltaTime * 60);
         
         // Stop if velocity is too small
         if (Math.abs(player.vx) < GAME_CONSTANTS.MIN_VELOCITY) player.vx = 0;
@@ -470,12 +472,15 @@ class Room {
                     
                     // Check for level up
                     const previousLevel = player.level;
-                    for (let level = 4; level >= 1; level--) {
-                        if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[level]) {
-                            player.level = level;
-                            break;
-                        }
+                    let newLevel = 1;
+                    if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[3]) { // 80 for L4
+                        newLevel = 4;
+                    } else if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[2]) { // 50 for L3
+                        newLevel = 3;
+                    } else if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[1]) { // 20 for L2
+                        newLevel = 2;
                     }
+                    player.level = newLevel;
                     
                     // Update abilities based on level
                     if (player.level >= GAME_CONSTANTS.ABILITIES.BURST.UNLOCK_LEVEL) {
@@ -547,6 +552,140 @@ class Room {
                 }
             }
         }
+        
+        // Check player-player collisions
+        const playerIds = Object.keys(this.gameState.players);
+        for (let i = 0; i < playerIds.length; i++) {
+            for (let j = i + 1; j < playerIds.length; j++) {
+                const playerA = this.gameState.players[playerIds[i]];
+                const playerB = this.gameState.players[playerIds[j]];
+
+                if (!playerA || !playerB) continue;
+
+                // Check for collision immunity
+                if (playerA.collisionImmunity > 0 || playerB.collisionImmunity > 0) {
+                    continue;
+                }
+
+                const radiusA = GAME_CONSTANTS.PLAYER_RADIUS * (GAME_CONSTANTS.LEVELS.SIZE_MULTIPLIERS[playerA.level - 1] || 1);
+                const radiusB = GAME_CONSTANTS.PLAYER_RADIUS * (GAME_CONSTANTS.LEVELS.SIZE_MULTIPLIERS[playerB.level - 1] || 1);
+
+                const dx = playerB.x - playerA.x;
+                const dy = playerB.y - playerA.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < radiusA + radiusB && distance > 0) {
+                    // --- Collision Detected ---
+
+                    // 1. Resolve Overlap
+                    const overlap = (radiusA + radiusB) - distance;
+                    const overlapX = (dx / distance) * overlap;
+                    const overlapY = (dy / distance) * overlap;
+
+                    playerA.x -= overlapX / 2;
+                    playerA.y -= overlapY / 2;
+                    playerB.x += overlapX / 2;
+                    playerB.y += overlapY / 2;
+
+                    // 2. Calculate Collision Physics (Bounce)
+                    const nx = dx / distance;
+                    const ny = dy / distance;
+                    const rvx = playerA.vx - playerB.vx;
+                    const rvy = playerA.vy - playerB.vy;
+                    const velAlongNormal = rvx * nx + rvy * ny;
+
+                    if (velAlongNormal > 0) continue; // Already moving apart
+
+                    const impulse = -(1 + GAME_CONSTANTS.COLLISION.ELASTICITY) * velAlongNormal;
+                    const impulseX = impulse * nx;
+                    const impulseY = impulse * ny;
+
+                    playerA.vx += impulseX;
+                    playerA.vy += impulseY;
+                    playerB.vx -= impulseX;
+                    playerB.vy -= impulseY;
+
+                    // 3. Handle Crystal Dropping
+                    let loser = null, winner = null;
+                    if (playerA.level > playerB.level) {
+                        loser = playerB; winner = playerA;
+                    } else if (playerB.level > playerA.level) {
+                        loser = playerA; winner = playerB;
+                    } else {
+                        // Levels are equal, decide by speed. Add a small tolerance to prevent ties from random floating point inaccuracies.
+                        const speedA = Math.sqrt(playerA.vx * playerA.vx + playerA.vy * playerA.vy);
+                        const speedB = Math.sqrt(playerB.vx * playerB.vx + playerB.vy * playerB.vy);
+                        
+                        if (speedA > speedB + 1) { // Player A is clearly faster
+                            loser = playerB;
+                            winner = playerA;
+                        } else if (speedB > speedA + 1) { // Player B is clearly faster
+                            loser = playerA;
+                            winner = playerB;
+                        }
+                        // Otherwise, speeds are too similar; it's a draw, no crystals dropped.
+                    }
+
+                    // Only proceed with crystal dropping if there was a clear loser
+                    if (loser) {
+                        const dropReduction = loser.crystalDropReduction || 0;
+                        const crystalsToDrop = Math.max(0, GAME_CONSTANTS.COLLISION.CRYSTAL_DROP_COUNT - dropReduction);
+                        const actualDropCount = Math.min(loser.crystalsCollected, crystalsToDrop);
+                        
+                        const droppedCrystals = [];
+                        if (actualDropCount > 0) {
+                            loser.crystalsCollected -= actualDropCount;
+                            loser.totalCrystalsDropped = (loser.totalCrystalsDropped || 0) + actualDropCount;
+                            
+                            // Check for level down
+                            const previousLevel = loser.level;
+                            let newLevel = 1;
+                            if (loser.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[3]) newLevel = 4;
+                            else if (loser.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[2]) newLevel = 3;
+                            else if (loser.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[1]) newLevel = 2;
+                            loser.level = newLevel;
+
+                            if (loser.level < previousLevel) {
+                                if (loser.level < GAME_CONSTANTS.ABILITIES.BURST.UNLOCK_LEVEL) loser.abilities.burst.available = false;
+                                if (loser.level < GAME_CONSTANTS.ABILITIES.WALL.UNLOCK_LEVEL) loser.abilities.wall.available = false;
+                            }
+
+                            // Spawn dropped crystals
+                            for (let k = 0; k < actualDropCount; k++) {
+                                const angle = Math.random() * Math.PI * 2;
+                                const scatterRadius = GAME_CONSTANTS.COLLISION.CRYSTAL_SCATTER_RADIUS * (0.5 + Math.random() * 0.5);
+                                const crystalId = 'crystal_' + crystalIdCounter++;
+                                
+                                const newCrystal = {
+                                    id: crystalId,
+                                    x: loser.x + Math.cos(angle) * scatterRadius,
+                                    y: loser.y + Math.sin(angle) * scatterRadius,
+                                    isPowerCrystal: false,
+                                    value: GAME_CONSTANTS.POINTS_PER_CRYSTAL
+                                };
+                                this.gameState.crystals[crystalId] = newCrystal;
+                                droppedCrystals.push(newCrystal);
+                                io.to(this.id).emit('crystalSpawned', newCrystal);
+                            }
+                        }
+                        
+                        // 5. Emit Collision Event to Clients (only if there's a loser)
+                        const impactSpeed = Math.abs(velAlongNormal);
+                        io.to(this.id).emit('collision', {
+                            players: [playerA.id, playerB.id],
+                            position: { x: playerA.x + dx / 2, y: playerA.y + dy / 2 },
+                            impactSpeed: impactSpeed,
+                            droppedCrystalIds: droppedCrystals.map(c => c.id),
+                            loserId: loser.id
+                        });
+                    }
+
+                    // 4. Apply Collision Immunity regardless of who lost crystals
+                    playerA.collisionImmunity = GAME_CONSTANTS.COLLISION.IMMUNITY_DURATION;
+                    playerB.collisionImmunity = GAME_CONSTANTS.COLLISION.IMMUNITY_DURATION;
+                }
+            }
+        }
     }
     
     spawnOrb() {
@@ -590,7 +729,9 @@ class Room {
                     gameTime: this.gameState.gameTime,
                     gamePhase: this.gameState.gamePhase,
                     warmupTime: this.gameState.warmupTime,
-                    nebulaCore: this.gameState.nebulaCore
+                    nebulaCore: this.gameState.nebulaCore,
+                    currentRound: this.gameState.currentRound,
+                    seriesScores: this.gameState.seriesScores
                 });
             }
         });
@@ -652,6 +793,55 @@ class Room {
         this.gameState.orbs = {};
         this.gameState.crystals = {};
         this.gameState.gameTime = 0;
+    }
+    
+    startNextRound() {
+        if (this.gameState.gamePhase !== 'ended') return;
+
+        this.gameState.currentRound++;
+        
+        // Reset game phase and timers
+        this.gameState.gameStarted = true;
+        this.gameState.gamePhase = 'warmup';
+        this.gameState.warmupTime = GAME_CONSTANTS.WIN_CONDITIONS.WARMUP_DURATION;
+        this.gameState.gameTime = GAME_CONSTANTS.WIN_CONDITIONS.GAME_DURATION;
+        this.gameState.winner = null;
+        this.gameState.winType = null;
+        this.gameState.playersReady = {}; // Reset ready state
+
+        // Initialize game objects for this room
+        this.initializeOrbs();
+        this.initializeCrystals();
+        
+        // Reset player positions and stats for the new round
+        for (const playerId in this.gameState.players) {
+            const player = this.gameState.players[playerId];
+            player.score = 0;
+            player.crystalsCollected = 0;
+            player.level = 1;
+            player.abilities.burst.available = false;
+            player.abilities.burst.cooldown = 0;
+            player.abilities.wall.available = false;
+            player.abilities.wall.cooldown = 0;
+            player.energy = GAME_CONSTANTS.ENERGY.MAX;
+            player.energyRegenTimer = 0;
+            player.walls = [];
+            player.collisionImmunity = 0;
+            player.x = Math.random() * GAME_CONSTANTS.WORLD_WIDTH;
+            player.y = Math.random() * GAME_CONSTANTS.WORLD_HEIGHT;
+            player.vx = 0;
+            player.vy = 0;
+            player.ax = 0;
+            player.ay = 0;
+        }
+
+        // Notify clients to start next round
+        io.to(this.id).emit('nextRoundStart', {
+            currentRound: this.gameState.currentRound
+        });
+
+        // Restart the room's update loop
+        this.startUpdateLoop();
     }
     
     initializeOrbs() {
@@ -759,6 +949,9 @@ io.on('connection', (socket) => {
             speedMultiplier: 1,
             crystalDropReduction: 0,
             energyCostReduction: 0,
+            dragModifier: 1,
+            hasCrystalCorruption: false,
+            crystalStealBonus: 0,
             // Stats tracking
             totalCrystalsDropped: 0,
             totalDamageDealt: 0,
@@ -832,7 +1025,19 @@ io.on('connection', (socket) => {
             energy: GAME_CONSTANTS.ENERGY.MAX,
             energyRegenTimer: 0,
             walls: [],
-            collisionImmunity: 0
+            collisionImmunity: 0,
+            // Upgrade properties
+            speedMultiplier: 1,
+            crystalDropReduction: 0,
+            energyCostReduction: 0,
+            dragModifier: 1,
+            hasCrystalCorruption: false,
+            crystalStealBonus: 0,
+            // Stats tracking
+            totalCrystalsDropped: 0,
+            totalDamageDealt: 0,
+            totalDistanceTraveled: 0,
+            abilitiesUsed: 0
         };
         
         room.addPlayer(playerId, playerData);
@@ -1170,8 +1375,6 @@ io.on('connection', (socket) => {
     });
     
     socket.on('selectUpgrade', (data) => {
-        console.log(`Player ${socket.playerId} selected upgrade: ${data.upgradeId} for round ${data.round}`);
-        
         // Get the room
         if (!socket.roomId || !socket.playerId) return;
         const room = rooms.get(socket.roomId);
@@ -1189,33 +1392,40 @@ io.on('connection', (socket) => {
         // Apply upgrade effects
         const player = room.gameState.players[socket.playerId];
         if (player) {
+            let logMessage = `[UPGRADE] Player ${player.name} (${socket.playerId}) applied '${data.upgradeId}'.`;
             switch(data.upgradeId) {
+                // --- UPGRADES ---
                 case 'kinetic_plating':
-                    // Reduce crystal drops on collision
                     player.crystalDropReduction = (player.crystalDropReduction || 0) + 2;
+                    logMessage += ` New crystalDropReduction: ${player.crystalDropReduction}`;
                     break;
                 case 'warp_coil':
-                    // Increase movement speed
                     player.speedMultiplier = (player.speedMultiplier || 1) * 1.15;
+                    logMessage += ` New speedMultiplier: ${player.speedMultiplier.toFixed(2)}`;
                     break;
                 case 'efficiency_matrix':
-                    // Reduce ability energy cost
                     player.energyCostReduction = (player.energyCostReduction || 0) + 0.2;
+                    logMessage += ` New energyCostReduction: ${player.energyCostReduction.toFixed(2)}`;
+                    break;
+                // --- CURSES ---
+                case 'unstable_thrusters':
+                    player.dragModifier = (player.dragModifier || 1) * 0.95; // Less drag = more slidey
+                    logMessage += ` New dragModifier: ${player.dragModifier.toFixed(2)}`;
+                    break;
+                case 'crystal_corruption':
+                    player.hasCrystalCorruption = true;
+                    logMessage += ` Player now has Crystal Corruption.`;
+                    break;
+                case 'glass_cannon':
+                    // Note: a negative reduction means you lose MORE crystals.
+                    player.crystalDropReduction = (player.crystalDropReduction || 0) - 2;
+                    logMessage += ` Player is now a Glass Cannon.`;
                     break;
             }
+            console.log(logMessage);
         }
         
-        // Check if all players have selected upgrades
-        const activePlayers = Object.keys(room.gameState.players).length;
-        const playersWithUpgrades = Object.keys(room.gameState.playerUpgrades)
-            .filter(id => room.gameState.playerUpgrades[id].some(u => u.round === room.gameState.currentRound))
-            .length;
-        
-        if (playersWithUpgrades >= activePlayers) {
-            // All players ready, start next round
-            // TODO: Implement room-specific startNextRound
-            // startNextRound();
-        }
+        // The check for starting the next round is now handled by the 'readyForNextRound' event.
     });
     
     socket.on('readyForNextRound', () => {
@@ -1235,8 +1445,7 @@ io.on('connection', (socket) => {
         const readyPlayers = Object.keys(room.gameState.playersReady).length;
         
         if (readyPlayers >= activePlayers) {
-            // TODO: Call room-specific startNextRound method
-            // startNextRound();
+            room.startNextRound();
         }
     });
     

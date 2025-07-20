@@ -1,4 +1,4 @@
-class GameArenaScene extends Phaser.Scene {
+class GameArenaScene extends BaseScene {
     constructor() {
         super({ key: 'GameArenaScene' });
         this.players = {};
@@ -47,20 +47,17 @@ class GameArenaScene extends Phaser.Scene {
         this.audioSettingsPanel = null;
         this.clientPredictionEnabled = true;
         this.lastInputVector = { x: 0, y: 0 };
+        this.seriesScores = {};
+        this.currentRound = 1;
     }
 
     init(data) {
-        console.log('[GAME ARENA INIT] Received data:', data);
-        
         // Reset all game state when scene starts/restarts
         this.players = {};
         this.orbs = {};
         this.crystals = {};
         this.myId = data?.playerId || null;
         this.roomId = data?.roomId || null;
-        
-        console.log('[GAME ARENA INIT] Set myId to:', this.myId);
-        console.log('[GAME ARENA INIT] Set roomId to:', this.roomId);
         
         this.trails = {};
         this.inputVector = { x: 0, y: 0 };
@@ -69,6 +66,8 @@ class GameArenaScene extends Phaser.Scene {
         this.currentPerformanceMode = 'medium';
         this.energy = 100;
         this.lastInputVector = { x: 0, y: 0 };
+        this.seriesScores = {};
+        this.currentRound = 1;
         
         // Clean up any existing tweens
         if (this.tweens) {
@@ -81,21 +80,21 @@ class GameArenaScene extends Phaser.Scene {
         this.audioManager = new AudioManager(this);
         // Simplified performance monitoring
         this.performanceMonitor = {
-            startMonitoring: () => console.log('Performance monitoring started'),
+            startMonitoring: () => {},
             update: () => {},
-            toggleDisplay: () => console.log('Performance display toggled'),
+            toggleDisplay: () => {},
             getAverageStats: () => ({ avgFps: 60 })
         };
         this.stressTester = {
-            quickFpsTest: () => console.log('FPS test'),
-            quickMemoryTest: () => console.log('Memory test'),
-            startStressTest: (level) => console.log(`Stress test: ${level}`),
+            quickFpsTest: () => {},
+            quickMemoryTest: () => {},
+            startStressTest: (level) => {},
             stopStressTest: () => ({ result: 'test completed' }),
             getRecommendations: () => 'No recommendations',
             isRunning: false
         };
         this.objectPool = {
-            cleanup: () => console.log('Object pool cleanup'),
+            cleanup: () => {},
             getAllStats: () => ({})
         };
     }
@@ -133,40 +132,32 @@ class GameArenaScene extends Phaser.Scene {
 
     createHUD() {
         // Crystal counter
-        this.crystalText = this.add.text(15, 15, 'Crystals: 0', {
-            fontSize: '20px',
+        this.crystalText = this.add.text(ScaleHelper.x(15), ScaleHelper.y(15), 'Crystals: 0', {
+            fontSize: ScaleHelper.font('20px'),
             fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 2
-        });
-
-        // Score counter
-        this.scoreText = this.add.text(15, 45, 'Score: 0', {
-            fontSize: '20px',
-            fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
-            stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 2
+            strokeThickness: ScaleHelper.scale(2)
         });
 
         // Level indicator
-        this.levelText = this.add.text(15, 75, 'Level: 1', {
-            fontSize: '18px',
+        this.levelText = this.add.text(ScaleHelper.x(15), ScaleHelper.y(75), 'Level: 1', {
+            fontSize: ScaleHelper.font('18px'),
             fill: GAME_CONSTANTS.UI.COLORS.SUCCESS,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 2
+            strokeThickness: ScaleHelper.scale(2)
         });
 
         // Game timer
-        this.timeText = this.add.text(400, 15, 'Time: 10:00', {
-            fontSize: '20px',
+        this.timeText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(15), 'Time: 10:00', {
+            fontSize: ScaleHelper.font('20px'),
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 2
+            strokeThickness: ScaleHelper.scale(2)
         }).setOrigin(0.5, 0);
 
         // Connection status
-        this.connectionStatus = this.add.text(15, this.game.config.height - 30, '● Connected', {
-            fontSize: '14px',
+        this.connectionStatus = this.add.text(ScaleHelper.x(15), ScaleHelper.height() - ScaleHelper.scale(30), '● Connected', {
+            fontSize: ScaleHelper.font('14px'),
             fill: GAME_CONSTANTS.UI.COLORS.SUCCESS
         });
 
@@ -183,54 +174,54 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     createProgressBar() {
-        const x = 15;
-        const y = 105;
-        const width = 280;
-        const height = 12;
+        const x = ScaleHelper.x(15);
+        const y = ScaleHelper.y(105);
+        const width = ScaleHelper.scale(280);
+        const height = ScaleHelper.scale(12);
 
         this.progressBarBg = this.add.graphics();
         this.progressBarBg.fillStyle(0x333333);
-        this.progressBarBg.fillRoundedRect(x, y, width, height, 6);
-        this.progressBarBg.lineStyle(2, 0x555555);
-        this.progressBarBg.strokeRoundedRect(x, y, width, height, 6);
+        this.progressBarBg.fillRoundedRect(x, y, width, height, ScaleHelper.scale(6));
+        this.progressBarBg.lineStyle(ScaleHelper.scale(2), 0x555555);
+        this.progressBarBg.strokeRoundedRect(x, y, width, height, ScaleHelper.scale(6));
 
         this.progressBar = this.add.graphics();
         this.updateProgressBar(0, 20);
     }
 
     updateProgressBar(current, target) {
-        const x = 15;
-        const y = 105;
-        const width = 280;
-        const height = 12;
+        const x = ScaleHelper.x(15);
+        const y = ScaleHelper.y(105);
+        const width = ScaleHelper.scale(280);
+        const height = ScaleHelper.scale(12);
         const progress = Math.min(current / target, 1);
-        const barWidth = (width - 4) * progress;
+        const barWidth = (width - ScaleHelper.scale(4)) * progress;
 
         this.progressBar.clear();
         if (barWidth > 0) {
             // Use XP gradient since PROGRESS gradient doesn't exist
             const colors = GAME_CONSTANTS.UI.GRADIENTS.XP;
             this.progressBar.fillGradientStyle(colors[0], colors[1], colors[0], colors[1]);
-            this.progressBar.fillRoundedRect(x + 2, y + 2, barWidth, height - 4, 4);
+            this.progressBar.fillRoundedRect(x + ScaleHelper.scale(2), y + ScaleHelper.scale(2), barWidth, height - ScaleHelper.scale(4), ScaleHelper.scale(4));
         }
     }
 
     createEnergyBar() {
-        const x = 15;
-        const y = 140;
-        const width = 280;
-        const height = 15;
+        const x = ScaleHelper.x(15);
+        const y = ScaleHelper.y(140);
+        const width = ScaleHelper.scale(280);
+        const height = ScaleHelper.scale(15);
 
         this.energyBarBg = this.add.graphics();
         this.energyBarBg.fillStyle(0x1a1a1a);
-        this.energyBarBg.fillRoundedRect(x, y, width, height, 7);
-        this.energyBarBg.lineStyle(2, 0x333333);
-        this.energyBarBg.strokeRoundedRect(x, y, width, height, 7);
+        this.energyBarBg.fillRoundedRect(x, y, width, height, ScaleHelper.scale(7));
+        this.energyBarBg.lineStyle(ScaleHelper.scale(2), 0x333333);
+        this.energyBarBg.strokeRoundedRect(x, y, width, height, ScaleHelper.scale(7));
 
         this.energyBar = this.add.graphics();
         
-        this.energyText = this.add.text(x + 10, y + height + 5, 'Energy: 100/100', {
-            fontSize: '14px',
+        this.energyText = this.add.text(x + ScaleHelper.scale(10), y + height + ScaleHelper.scale(5), 'Energy: 100/100', {
+            fontSize: ScaleHelper.font('14px'),
             fill: GAME_CONSTANTS.UI.COLORS.PRIMARY
         });
         
@@ -238,10 +229,10 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     updateEnergyBar(current, max) {
-        const x = 15;
-        const y = 140;
-        const width = 280;
-        const height = 15;
+        const x = ScaleHelper.x(15);
+        const y = ScaleHelper.y(140);
+        const width = ScaleHelper.scale(280);
+        const height = ScaleHelper.scale(15);
         const progress = Math.min(current / max, 1);
         const barWidth = width * progress;
         
@@ -250,18 +241,18 @@ class GameArenaScene extends Phaser.Scene {
         if (barWidth > 0) {
             const colors = GAME_CONSTANTS.UI.GRADIENTS.ENERGY;
             this.energyBar.fillGradientStyle(colors[0], colors[1], colors[0], colors[1]);
-            this.energyBar.fillRoundedRect(x + 2, y + 2, barWidth - 4, height - 4, 5);
+            this.energyBar.fillRoundedRect(x + ScaleHelper.scale(2), y + ScaleHelper.scale(2), barWidth - ScaleHelper.scale(4), height - ScaleHelper.scale(4), ScaleHelper.scale(5));
         }
         
         this.energyText.setText(`Energy: ${Math.floor(current)}/${max}`);
     }
 
     createAbilityDisplay() {
-        this.abilityText = this.add.text(15, 180, '', {
-            fontSize: '16px',
+        this.abilityText = this.add.text(ScaleHelper.x(15), ScaleHelper.y(180), '', {
+            fontSize: ScaleHelper.font('16px'),
             fill: GAME_CONSTANTS.UI.COLORS.WARNING,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 1
+            strokeThickness: ScaleHelper.scale(1)
         });
         this.updateAbilityDisplay();
     }
@@ -322,13 +313,13 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     createVirtualJoystick() {
-        const joystickX = 80;
-        const joystickY = this.game.config.height - 80;
-        const baseRadius = 40;
-        const thumbRadius = 20;
+        const joystickX = ScaleHelper.x(80);
+        const joystickY = ScaleHelper.height() - ScaleHelper.scale(80);
+        const baseRadius = ScaleHelper.scale(40);
+        const thumbRadius = ScaleHelper.scale(20);
 
         this.joystickBase = this.add.circle(joystickX, joystickY, baseRadius, 0x333333, 0.5);
-        this.joystickBase.setStrokeStyle(2, 0x666666);
+        this.joystickBase.setStrokeStyle(ScaleHelper.scale(2), 0x666666);
         
         this.joystickThumb = this.add.circle(joystickX, joystickY, thumbRadius, 0x666666);
         this.joystickThumb.setInteractive();
@@ -362,7 +353,7 @@ class GameArenaScene extends Phaser.Scene {
     updateVirtualJoystick(x, y) {
         const baseX = this.virtualJoystick.baseX;
         const baseY = this.virtualJoystick.baseY;
-        const maxDistance = 35;
+        const maxDistance = ScaleHelper.scale(35);
         
         const distance = Phaser.Math.Distance.Between(baseX, baseY, x, y);
         
@@ -390,13 +381,8 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     handlePointerDown(pointer) {
-        console.log('[INPUT] Pointer down at:', pointer.x, pointer.y);
-        console.log('[INPUT] My ID:', this.myId);
-        console.log('[INPUT] My player exists:', !!this.players[this.myId]);
-        console.log('[INPUT] Game phase:', this.gamePhase);
-        
         if (this.isMobile && this.virtualJoystick && 
-            Phaser.Math.Distance.Between(pointer.x, pointer.y, this.virtualJoystick.baseX, this.virtualJoystick.baseY) < 60) {
+            Phaser.Math.Distance.Between(pointer.x, pointer.y, this.virtualJoystick.baseX, this.virtualJoystick.baseY) < ScaleHelper.scale(60)) {
             return;
         }
 
@@ -430,10 +416,6 @@ class GameArenaScene extends Phaser.Scene {
 
     updatePlayerMovement(delta) {
         if (!this.myId || this.gamePhase !== 'playing') {
-            if (!this.lastMovementDebug || Date.now() - this.lastMovementDebug > 5000) {
-                console.log('[MOVEMENT] Blocked - myId:', this.myId, 'gamePhase:', this.gamePhase);
-                this.lastMovementDebug = Date.now();
-            }
             return;
         }
 
@@ -469,7 +451,6 @@ class GameArenaScene extends Phaser.Scene {
         }
 
         if (moveX !== this.lastInputVector.x || moveY !== this.lastInputVector.y) {
-            console.log('Client sending move:', { ax: moveX, ay: moveY });
             this.game.socket.emit('playerMove', { ax: moveX, ay: moveY });
             this.lastInputVector.x = moveX;
             this.lastInputVector.y = moveY;
@@ -580,7 +561,7 @@ class GameArenaScene extends Phaser.Scene {
             this.enhanceLevelUpEffects(data.playerId, data.level);
             if (data.playerId === this.myId) {
                 this.audioManager.playLevelUpSound();
-                this.createFloatingText(this.players[this.myId].x, this.players[this.myId].y - 50, `Level ${data.level}!`, this.getLevelColor(data.level));
+                this.createFloatingText(this.players[this.myId].x, this.players[this.myId].y - ScaleHelper.scale(50), `Level ${data.level}!`, this.getLevelColor(data.level));
             }
         });
 
@@ -650,22 +631,14 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     updateGameState(data) {
-        console.log('[GAME STATE] Before update - My ID:', this.myId);
-        console.log('[GAME STATE] Server sent myId:', data.myId);
-        
         // Only update myId if the server sends a valid one
         if (data.myId) {
             this.myId = data.myId;
         }
         
-        console.log('[GAME STATE] After update - My ID:', this.myId);
-        console.log('[GAME STATE] Players received:', Object.keys(data.players));
-        console.log('[GAME STATE] Game phase:', data.gamePhase);
-        
         // Update players
         Object.keys(data.players).forEach(playerId => {
             if (!this.players[playerId]) {
-                console.log('[GAME STATE] Adding new player:', playerId, data.players[playerId].name);
                 this.addPlayer(playerId, data.players[playerId]);
             } else {
                 this.updatePlayer(playerId, data.players[playerId]);
@@ -722,6 +695,15 @@ class GameArenaScene extends Phaser.Scene {
         if (data.nebulaCore) {
             this.updateNebulaCoreControl(data.nebulaCore);
         }
+
+        if (data.currentRound) {
+            this.currentRound = data.currentRound;
+            this.updateWinConditionPanel();
+        }
+
+        if (data.seriesScores) {
+            this.seriesScores = data.seriesScores;
+        }
         
         this.updatePlayerList(data.players);
     }
@@ -734,11 +716,11 @@ class GameArenaScene extends Phaser.Scene {
         orb.setOrigin(0.5);
         
         // Add player name label
-        const nameText = this.add.text(playerData.x, playerData.y - 30, playerData.name || `Player ${playerId.substr(-4)}`, {
-            fontSize: '12px',
+        const nameText = this.add.text(playerData.x, playerData.y - ScaleHelper.scale(30), playerData.name || `Player ${playerId.substr(-4)}`, {
+            fontSize: ScaleHelper.font('12px'),
             fill: '#ffffff',
             stroke: '#000000',
-            strokeThickness: 2
+            strokeThickness: ScaleHelper.scale(2)
         }).setOrigin(0.5);
         
         // Add "YOU" indicator for the current player
@@ -865,9 +847,6 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     updatePlayerScore(playerId, score) {
-        if (this.scoreText && playerId === this.myId) {
-            this.scoreText.setText(`Score: ${score}`);
-        }
         const player = this.players[playerId];
         if (player) {
             player.score = score;
@@ -961,11 +940,11 @@ class GameArenaScene extends Phaser.Scene {
             
             // Show ability unlock notifications
             if (level === 3 && !this.abilities.burst.notified) {
-                this.createFloatingText(400, 300, 'Burst Ability Unlocked! Press Q', GAME_CONSTANTS.UI.COLORS.WARNING, '24px');
+                this.createFloatingText(ScaleHelper.centerX(), ScaleHelper.centerY() - ScaleHelper.scale(100), 'Burst Ability Unlocked! Press Q', GAME_CONSTANTS.UI.COLORS.WARNING, '24px');
                 this.abilities.burst.notified = true;
             }
             if (level === 4 && !this.abilities.wall.notified) {
-                this.createFloatingText(400, 300, 'Wall Ability Unlocked! Press E', GAME_CONSTANTS.UI.COLORS.WARNING, '24px');
+                this.createFloatingText(ScaleHelper.centerX(), ScaleHelper.centerY() - ScaleHelper.scale(100), 'Wall Ability Unlocked! Press E', GAME_CONSTANTS.UI.COLORS.WARNING, '24px');
                 this.abilities.wall.notified = true;
                 // Show nebula core
                 this.showNebulaCore();
@@ -1055,7 +1034,7 @@ class GameArenaScene extends Phaser.Scene {
         const radius = GAME_CONSTANTS.NEBULA_CORE.RADIUS;
         
         this.nebulaCore = this.add.circle(x, y, radius, 0x8000ff, 0.3);
-        this.nebulaCore.setStrokeStyle(3, 0xff00ff);
+        this.nebulaCore.setStrokeStyle(ScaleHelper.scale(3), 0xff00ff);
         
         // Pulsing effect
         this.tweens.add({
@@ -1074,7 +1053,7 @@ class GameArenaScene extends Phaser.Scene {
             fontSize: '18px',
             fill: GAME_CONSTANTS.UI.COLORS.DANGER,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 2,
+            strokeThickness: ScaleHelper.scale(2),
             fontWeight: 'bold'
         }).setOrigin(0.5);
     }
@@ -1171,15 +1150,12 @@ class GameArenaScene extends Phaser.Scene {
     handleCollision(data) {
         this.enhanceCollisionEffects(data);
         this.audioManager.playCollisionSound(data.impactSpeed);
-        
-        if (data.crystalsDropped && data.crystalsDropped.length > 0) {
-            data.crystalsDropped.forEach(crystal => {
-                this.addCrystal(crystal.id, crystal);
-            });
-            
-            // Show crystal drop notification
-            if (data.collidedPlayerId === this.myId) {
-                this.createFloatingText(data.position.x, data.position.y, '-5 crystals!', GAME_CONSTANTS.UI.COLORS.DANGER);
+
+        if (data.loserId === this.myId && data.droppedCrystalIds && data.droppedCrystalIds.length > 0) {
+            // Player who lost crystals gets a notification
+            const player = this.players[data.loserId];
+            if (player) {
+                this.createFloatingText(player.x, player.y - ScaleHelper.scale(40), `-${data.droppedCrystalIds.length} crystals!`, GAME_CONSTANTS.UI.COLORS.DANGER);
             }
         }
     }
@@ -1195,7 +1171,7 @@ class GameArenaScene extends Phaser.Scene {
                     fontSize: '18px',
                     fill: GAME_CONSTANTS.UI.COLORS.WARNING,
                     stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-                    strokeThickness: 2,
+                    strokeThickness: ScaleHelper.scale(2),
                     fontWeight: 'bold'
                 }).setOrigin(0.5);
             }
@@ -1225,7 +1201,7 @@ class GameArenaScene extends Phaser.Scene {
         this.createParticleExplosion(position.x, position.y, { ...config, COUNT: particleCount }, color);
         
         if (isPowerCrystal) {
-            this.createFloatingText(position.x, position.y - 20, '+50', GAME_CONSTANTS.UI.COLORS.DANGER, '20px');
+            this.createFloatingText(position.x, position.y - ScaleHelper.scale(20), '+50', GAME_CONSTANTS.UI.COLORS.DANGER, '20px');
         }
     }
 
@@ -1233,7 +1209,7 @@ class GameArenaScene extends Phaser.Scene {
     createEnhancedBackground() {
         const bg = this.add.graphics();
         bg.fillGradientStyle(0x110033, 0x220044, 0x000022, 0x330055);
-        bg.fillRect(0, 0, 800, 600);
+        bg.fillRect(0, 0, ScaleHelper.width(), ScaleHelper.height());
         this.createAnimatedStarfield();
         this.createNebulaParticles();
     }
@@ -1242,7 +1218,7 @@ class GameArenaScene extends Phaser.Scene {
         const starConfig = GAME_CONSTANTS.VISUAL_EFFECTS.ENVIRONMENT.STARS;
         for (let i = 0; i < starConfig.COUNT; i++) {
             const star = this.add.circle(
-                Phaser.Math.Between(0, 800), Phaser.Math.Between(0, 600),
+                Phaser.Math.Between(0, ScaleHelper.width()), Phaser.Math.Between(0, ScaleHelper.height()),
                 Phaser.Math.FloatBetween(starConfig.MIN_SIZE, starConfig.MAX_SIZE),
                 0xffffff, Phaser.Math.FloatBetween(0.3, 1.0)
             );
@@ -1261,7 +1237,7 @@ class GameArenaScene extends Phaser.Scene {
         const nebulaConfig = GAME_CONSTANTS.VISUAL_EFFECTS.PARTICLES.AMBIENT_NEBULA;
         for (let i = 0; i < nebulaConfig.COUNT; i++) {
             const particle = this.add.circle(
-                Phaser.Math.Between(0, 800), Phaser.Math.Between(0, 600),
+                Phaser.Math.Between(0, ScaleHelper.width()), Phaser.Math.Between(0, ScaleHelper.height()),
                 Phaser.Math.Between(nebulaConfig.MIN_SIZE, nebulaConfig.MAX_SIZE),
                 Phaser.Utils.Array.GetRandom(nebulaConfig.COLORS),
                 Phaser.Math.FloatBetween(0.1, 0.4)
@@ -1298,8 +1274,8 @@ class GameArenaScene extends Phaser.Scene {
         this.backgroundStars.forEach(star => {
             star.x = star.initialX + Math.sin(this.nebulaAnimationTime * movement.SPEED + star.moveAngle) * movement.WAVE_AMPLITUDE;
             star.y = star.initialY + Math.cos(this.nebulaAnimationTime * movement.SPEED + star.moveAngle) * movement.WAVE_AMPLITUDE;
-            if (star.x < -10) star.x = 810; if (star.x > 810) star.x = -10;
-            if (star.y < -10) star.y = 610; if (star.y > 610) star.y = -10;
+            if (star.x < -10) star.x = ScaleHelper.width() + 10; if (star.x > ScaleHelper.width() + 10) star.x = -10;
+            if (star.y < -10) star.y = ScaleHelper.height() + 10; if (star.y > ScaleHelper.height() + 10) star.y = -10;
         });
     }
     
@@ -1307,8 +1283,8 @@ class GameArenaScene extends Phaser.Scene {
         this.ambientParticles.forEach(particle => {
             particle.x += particle.velocity.x * deltaTime;
             particle.y += particle.velocity.y * deltaTime;
-            if (particle.x < -20) particle.x = 820; if (particle.x > 820) particle.x = -20;
-            if (particle.y < -20) particle.y = 620; if (particle.y > 620) particle.y = -20;
+            if (particle.x < -20) particle.x = ScaleHelper.width() + 20; if (particle.x > ScaleHelper.width() + 20) particle.x = -20;
+            if (particle.y < -20) particle.y = ScaleHelper.height() + 20; if (particle.y > ScaleHelper.height() + 20) particle.y = -20;
         });
     }
     
@@ -1322,11 +1298,11 @@ class GameArenaScene extends Phaser.Scene {
     createFloatingText(x, y, text, color = '#ffffff', size = '24px') {
         const config = GAME_CONSTANTS.VISUAL_EFFECTS.ANIMATIONS.FLOATING_TEXT;
         const floatingText = this.add.text(x, y, text, {
-            fontSize: size, fill: color, fontWeight: 'bold',
-            stroke: '#000000', strokeThickness: 2
+            fontSize: ScaleHelper.font(size), fill: color, fontWeight: 'bold',
+            stroke: '#000000', strokeThickness: ScaleHelper.scale(2)
         }).setOrigin(0.5);
         this.tweens.add({
-            targets: floatingText, y: y - config.RISE_DISTANCE, alpha: 0,
+            targets: floatingText, y: y - ScaleHelper.scale(config.RISE_DISTANCE), alpha: 0,
             duration: config.DURATION, delay: config.FADE_DELAY, ease: 'Power2',
             onComplete: () => {
                 floatingText.destroy();
@@ -1352,7 +1328,7 @@ class GameArenaScene extends Phaser.Scene {
     }
     
     createScreenFlash(color, intensity = 0.6, duration = 150) {
-        const flash = this.add.rectangle(400, 300, 800, 600, color, intensity);
+        const flash = this.add.rectangle(ScaleHelper.centerX(), ScaleHelper.centerY(), ScaleHelper.width(), ScaleHelper.height(), color, intensity);
         flash.setDepth(1000);
         this.tweens.add({
             targets: flash, alpha: 0, duration: duration,
@@ -1362,10 +1338,10 @@ class GameArenaScene extends Phaser.Scene {
     }
     
     createShockwave(x, y, intensity) {
-        const shockwave = this.add.circle(x, y, 1, 0xffffff, 0);
-        shockwave.setStrokeStyle(3, 0xffffff);
+        const shockwave = this.add.circle(x, y, ScaleHelper.scale(1), 0xffffff, 0);
+        shockwave.setStrokeStyle(ScaleHelper.scale(3), 0xffffff);
         this.tweens.add({
-            targets: shockwave, radius: 100 + (intensity / 10),
+            targets: shockwave, radius: ScaleHelper.scale(100) + (intensity / 10),
             alpha: { from: 0.8, to: 0 }, duration: 500, ease: 'Power2',
             onComplete: () => shockwave.destroy()
         });
@@ -1408,19 +1384,19 @@ class GameArenaScene extends Phaser.Scene {
         this.createParticleExplosion(player.x, player.y, levelUpConfig, levelColor);
         
         // Floating text
-        this.createFloatingText(player.x, player.y - 50, 'LEVEL UP!', this.getLevelColor(newLevel), '32px');
+        this.createFloatingText(player.x, player.y - ScaleHelper.scale(50), 'LEVEL UP!', this.getLevelColor(newLevel), '32px');
         
         // Ring expansion effect
         this.createLevelUpRing(player.x, player.y, levelColor);
     }
     
     createLevelUpRing(x, y, color) {
-        const ring = this.add.circle(x, y, 20, color, 0);
-        ring.setStrokeStyle(4, color);
+        const ring = this.add.circle(x, y, ScaleHelper.scale(20), color, 0);
+        ring.setStrokeStyle(ScaleHelper.scale(4), color);
         
         this.tweens.add({
             targets: ring,
-            radius: 120,
+            radius: ScaleHelper.scale(120),
             alpha: { from: 1, to: 0 },
             duration: 1000,
             ease: 'Power2',
@@ -1586,52 +1562,71 @@ class GameArenaScene extends Phaser.Scene {
 
     // Additional UI methods
     createWinConditionPanel() {
-        const panelWidth = 400;
-        const panelHeight = 60;
-        const x = 400 - panelWidth / 2;
-        const y = 10;
+        const panelWidth = ScaleHelper.scale(400);
+        const panelHeight = ScaleHelper.scale(60);
+        const x = ScaleHelper.centerX() - panelWidth / 2;
+        const y = ScaleHelper.y(10);
         
         // Panel background
         this.winPanel = this.add.graphics();
         this.winPanel.fillGradientStyle(0x2a2a2a, 0x2a2a2a, 0x1a1a1a, 0x1a1a1a);
-        this.winPanel.fillRoundedRect(x, y, panelWidth, panelHeight, 12);
-        this.winPanel.lineStyle(2, 0xff00ff);
-        this.winPanel.strokeRoundedRect(x, y, panelWidth, panelHeight, 12);
+        this.winPanel.fillRoundedRect(x, y, panelWidth, panelHeight, ScaleHelper.scale(12));
+        this.winPanel.lineStyle(ScaleHelper.scale(2), 0xff00ff);
+        this.winPanel.strokeRoundedRect(x, y, panelWidth, panelHeight, ScaleHelper.scale(12));
         
-        // Win condition text
-        this.winConditionText = this.add.text(400, y + panelHeight / 2, `First to ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET} crystals wins!`, {
-            fontSize: '22px',
+        // Round Info Text
+        this.roundInfoText = this.add.text(ScaleHelper.centerX(), y + ScaleHelper.scale(20), `Round ${this.currentRound} / 5`, {
+            fontSize: ScaleHelper.font('22px'),
             fontFamily: 'Arial Black',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 2
+            strokeThickness: ScaleHelper.scale(2)
         }).setOrigin(0.5);
+
+        // Win condition text
+        this.winConditionText = this.add.text(ScaleHelper.centerX(), y + ScaleHelper.scale(45), `First to ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET} crystals wins!`, {
+            fontSize: ScaleHelper.font('16px'),
+            fontFamily: 'Arial',
+            fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
+        }).setOrigin(0.5);
+    }
+    
+    updateWinConditionPanel() {
+        if (this.roundInfoText) {
+            this.roundInfoText.setText(`Round ${this.currentRound} / 5`);
+        }
     }
     
     createPlayerListPanel() {
         if (this.isMobile) return; // Skip on mobile to save space
         
-        const panelWidth = 200;
-        const panelHeight = 150;
-        const x = 600;
-        const y = 80;
+        const panelWidth = ScaleHelper.scale(200);
+        const panelHeight = ScaleHelper.scale(150);
+        const x = ScaleHelper.x(600);
+        const y = ScaleHelper.y(80);
         
         // Panel background
         this.playerPanel = this.add.graphics();
         this.playerPanel.fillStyle(0x1a1a1a, 0.9);
-        this.playerPanel.fillRoundedRect(x, y, panelWidth, panelHeight, 8);
-        this.playerPanel.lineStyle(1, 0x00ffff);
-        this.playerPanel.strokeRoundedRect(x, y, panelWidth, panelHeight, 8);
+        this.playerPanel.fillRoundedRect(x, y, panelWidth, panelHeight, ScaleHelper.scale(8));
+        this.playerPanel.lineStyle(ScaleHelper.scale(1), 0x00ffff);
+        this.playerPanel.strokeRoundedRect(x, y, panelWidth, panelHeight, ScaleHelper.scale(8));
         
         // Title
-        this.add.text(x + 10, y + 10, 'Players', {
+        this.add.text(x + ScaleHelper.scale(100), y + ScaleHelper.scale(10), 'Players', {
             ...GAME_CONSTANTS.UI.FONTS.BODY,
+            fontSize: ScaleHelper.font(GAME_CONSTANTS.UI.FONTS.BODY.fontSize),
             fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
             fontWeight: 'bold'
-        });
+        }).setOrigin(0.5, 0);
         
+        // Column Headers
+        this.add.text(x + ScaleHelper.scale(10), y + ScaleHelper.scale(35), 'Player', { fontSize: ScaleHelper.font('12px'), fill: '#ccc' });
+        this.add.text(x + ScaleHelper.scale(110), y + ScaleHelper.scale(35), 'Wins', { fontSize: ScaleHelper.font('12px'), fill: '#ccc' });
+        this.add.text(x + ScaleHelper.scale(150), y + ScaleHelper.scale(35), 'Crystals', { fontSize: ScaleHelper.font('12px'), fill: '#ccc' });
+
         // Player list container
-        this.playerListContainer = this.add.container(x + 10, y + 35);
+        this.playerListContainer = this.add.container(x + ScaleHelper.scale(10), y + ScaleHelper.scale(55));
     }
     
     updatePlayerList(players) {
@@ -1663,58 +1658,66 @@ class GameArenaScene extends Phaser.Scene {
             }
         });
         
-        // Sort by crystals collected
-        const sortedPlayers = playerArray.sort((a, b) => b.crystalsCollected - a.crystalsCollected);
+        // Sort by series wins, then by current round crystals
+        const sortedPlayers = playerArray.sort((a, b) => {
+            const winsA = this.seriesScores[a.id] || 0;
+            const winsB = this.seriesScores[b.id] || 0;
+            if (winsB !== winsA) {
+                return winsB - winsA;
+            }
+            return b.crystalsCollected - a.crystalsCollected;
+        });
         
         // Add players with their stats
         sortedPlayers.forEach((player, index) => {
-            const yPos = index * 25;
+            const yPos = index * ScaleHelper.scale(20);
             const isMe = player.id === this.myId;
+            const wins = this.seriesScores[player.id] || 0;
             
             // Display text - only show "You" for the actual current player
             const displayText = isMe ? 'You' : player.name;
             
             // Player name/indicator
             const playerText = this.add.text(0, yPos, displayText, {
-                fontSize: '14px',
+                fontSize: ScaleHelper.font('14px'),
                 fill: isMe ? GAME_CONSTANTS.UI.COLORS.WARNING : GAME_CONSTANTS.UI.COLORS.WHITE,
                 fontWeight: isMe ? 'bold' : 'normal'
             });
             
-            // Level indicator
-            const levelText = this.add.text(120, yPos, `L${player.level}`, {
-                fontSize: '12px',
-                fill: this.getLevelColor(player.level)
+            // Wins count
+            const winsText = this.add.text(ScaleHelper.scale(110), yPos, `🏆 ${wins}`, {
+                fontSize: ScaleHelper.font('12px'),
+                fill: '#ffd700'
             });
             
             // Crystal count
-            const crystalText = this.add.text(150, yPos, `${player.crystalsCollected}`, {
-                fontSize: '12px',
+            const crystalText = this.add.text(ScaleHelper.scale(150), yPos, `${player.crystalsCollected}`, {
+                fontSize: ScaleHelper.font('12px'),
                 fill: GAME_CONSTANTS.UI.COLORS.PRIMARY
             });
             
-            this.playerListContainer.add([playerText, levelText, crystalText]);
+            this.playerListContainer.add([playerText, winsText, crystalText]);
         });
     }
     
     createMinimap() {
-        const minimapSize = 120;
-        const x = 670;
-        const y = 250;
+        const minimapSize = ScaleHelper.scale(120);
+        const x = ScaleHelper.x(670);
+        const y = ScaleHelper.y(250);
         
         // Minimap background
         this.minimapBg = this.add.graphics();
         this.minimapBg.fillStyle(0x000000, 0.7);
         this.minimapBg.fillRect(x, y, minimapSize, minimapSize * (GAME_CONSTANTS.WORLD_HEIGHT / GAME_CONSTANTS.WORLD_WIDTH));
-        this.minimapBg.lineStyle(1, 0x00ffff);
+        this.minimapBg.lineStyle(ScaleHelper.scale(1), 0x00ffff);
         this.minimapBg.strokeRect(x, y, minimapSize, minimapSize * (GAME_CONSTANTS.WORLD_HEIGHT / GAME_CONSTANTS.WORLD_WIDTH));
         
         // Minimap objects container
         this.minimapContainer = this.add.container(x, y);
         
         // Add title
-        this.add.text(x + minimapSize / 2, y - 20, 'Map', {
-            fontSize: '14px',
+        this.add.text(x + minimapSize / 2, y - ScaleHelper.scale(20), 'Map', {
+            fontSize: ScaleHelper.font('14px'),
             fill: GAME_CONSTANTS.UI.COLORS.PRIMARY
         }).setOrigin(0.5);
     }
@@ -1722,7 +1725,7 @@ class GameArenaScene extends Phaser.Scene {
     updateMinimap() {
         if (!this.minimapContainer) return;
         
-        const minimapSize = 120;
+        const minimapSize = ScaleHelper.scale(120);
         const scaleX = minimapSize / GAME_CONSTANTS.WORLD_WIDTH;
         const scaleY = (minimapSize * (GAME_CONSTANTS.WORLD_HEIGHT / GAME_CONSTANTS.WORLD_WIDTH)) / GAME_CONSTANTS.WORLD_HEIGHT;
         
@@ -1749,25 +1752,25 @@ class GameArenaScene extends Phaser.Scene {
     }
     
     createControlsHelpPanel() {
-        const panelWidth = this.isMobile ? 280 : 320;
-        const panelHeight = this.isMobile ? 80 : 100;
-        const x = this.isMobile ? 10 : 450;
-        const y = this.isMobile ? 470 : 480;
+        const panelWidth = this.isMobile ? ScaleHelper.scale(280) : ScaleHelper.scale(320);
+        const panelHeight = this.isMobile ? ScaleHelper.scale(80) : ScaleHelper.scale(100);
+        const x = this.isMobile ? ScaleHelper.x(10) : ScaleHelper.x(450);
+        const y = this.isMobile ? ScaleHelper.y(470) : ScaleHelper.y(480);
         
         // Panel background
         this.controlsPanel = this.add.graphics();
         this.controlsPanel.fillStyle(0x1a1a1a, 0.8);
-        this.controlsPanel.fillRoundedRect(x, y, panelWidth, panelHeight, 8);
-        this.controlsPanel.lineStyle(1, 0x555555);
-        this.controlsPanel.strokeRoundedRect(x, y, panelWidth, panelHeight, 8);
+        this.controlsPanel.fillRoundedRect(x, y, panelWidth, panelHeight, ScaleHelper.scale(8));
+        this.controlsPanel.lineStyle(ScaleHelper.scale(1), 0x555555);
+        this.controlsPanel.strokeRoundedRect(x, y, panelWidth, panelHeight, ScaleHelper.scale(8));
         
         // Controls text
         const controlsText = this.isMobile ? 
             'Touch and drag to move\nTap for abilities when unlocked' :
             'WASD/Arrow Keys: Move\nQ: Energy Burst (L3+)  E: Energy Wall (L4+)\nM: Audio Settings';
             
-        this.controlsText = this.add.text(x + 10, y + 10, controlsText, {
-            fontSize: this.isMobile ? '12px' : '14px',
+        this.controlsText = this.add.text(x + ScaleHelper.scale(10), y + ScaleHelper.scale(10), controlsText, {
+            fontSize: this.isMobile ? ScaleHelper.font('12px') : ScaleHelper.font('14px'),
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
             lineSpacing: 5
         });
@@ -1811,7 +1814,7 @@ class GameArenaScene extends Phaser.Scene {
         
         // Adjust positions for safe areas
         if (this.connectionStatus) {
-            this.connectionStatus.setPosition(padding, this.game.config.height - 30);
+            this.connectionStatus.setPosition(padding, ScaleHelper.height() - ScaleHelper.scale(30));
         }
         
         // Ensure touch-friendly ability buttons
@@ -1821,13 +1824,13 @@ class GameArenaScene extends Phaser.Scene {
     createMobileAbilityButtons() {
         if (!this.isMobile) return;
         
-        const buttonSize = Math.max(GAME_CONSTANTS.UI.MOBILE.MIN_TOUCH_SIZE, 50);
-        const spacing = 70;
-        const startY = this.game.config.height - 140;
+        const buttonSize = Math.max(GAME_CONSTANTS.UI.MOBILE.MIN_TOUCH_SIZE, ScaleHelper.scale(50));
+        const spacing = ScaleHelper.scale(70);
+        const startY = ScaleHelper.height() - ScaleHelper.scale(140);
         
         // Burst ability button
-        this.burstButton = this.add.circle(this.game.config.width - 80, startY, buttonSize / 2, 0xffff00, 0.7);
-        this.burstButton.setStrokeStyle(2, 0xffffff);
+        this.burstButton = this.add.circle(ScaleHelper.width() - ScaleHelper.scale(80), startY, buttonSize / 2, 0xffff00, 0.7);
+        this.burstButton.setStrokeStyle(ScaleHelper.scale(2), 0xffffff);
         this.burstButton.setInteractive();
         this.burstButton.on('pointerdown', () => {
             if (this.abilities.burst.available && this.abilities.burst.cooldown === 0) {
@@ -1835,15 +1838,15 @@ class GameArenaScene extends Phaser.Scene {
             }
         });
         
-        this.burstButtonText = this.add.text(this.game.config.width - 80, startY, 'Q', {
-            fontSize: '20px',
+        this.burstButtonText = this.add.text(ScaleHelper.width() - ScaleHelper.scale(80), startY, 'Q', {
+            fontSize: ScaleHelper.font('20px'),
             fill: GAME_CONSTANTS.UI.COLORS.BLACK,
             fontWeight: 'bold'
         }).setOrigin(0.5);
         
         // Wall ability button
-        this.wallButton = this.add.circle(this.game.config.width - 80, startY - spacing, buttonSize / 2, 0x00ffff, 0.7);
-        this.wallButton.setStrokeStyle(2, 0xffffff);
+        this.wallButton = this.add.circle(ScaleHelper.width() - ScaleHelper.scale(80), startY - spacing, buttonSize / 2, 0x00ffff, 0.7);
+        this.wallButton.setStrokeStyle(ScaleHelper.scale(2), 0xffffff);
         this.wallButton.setInteractive();
         this.wallButton.on('pointerdown', () => {
             if (this.abilities.wall.available && this.abilities.wall.cooldown === 0) {
@@ -1851,8 +1854,8 @@ class GameArenaScene extends Phaser.Scene {
             }
         });
         
-        this.wallButtonText = this.add.text(this.game.config.width - 80, startY - spacing, 'E', {
-            fontSize: '20px',
+        this.wallButtonText = this.add.text(ScaleHelper.width() - ScaleHelper.scale(80), startY - spacing, 'E', {
+            fontSize: ScaleHelper.font('20px'),
             fill: GAME_CONSTANTS.UI.COLORS.BLACK,
             fontWeight: 'bold'
         }).setOrigin(0.5);
@@ -2237,8 +2240,6 @@ class GameArenaScene extends Phaser.Scene {
         
         // Clean up unused tweens
         this.tweens.killAll();
-        
-        console.log('Memory cleanup performed');
     }
     
     disableParticleEffects() {
