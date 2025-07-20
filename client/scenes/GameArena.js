@@ -1207,11 +1207,106 @@ class GameArenaScene extends BaseScene {
 
     // Visual Effects Methods
     createEnhancedBackground() {
+        // Always create gradient background first
+        this.createGradientBackground();
+        
+        // Then try to add video on top if available
+        console.log('[VIDEO] Attempting to add video background...');
+        
+        if (this.cache.video.exists('nebulaVideo')) {
+            console.log('[VIDEO] Video found in cache!');
+            
+            try {
+                // Create video element at depth 0 (background)
+                this.nebulaVideo = this.add.video(ScaleHelper.centerX(), ScaleHelper.centerY(), 'nebulaVideo');
+                this.nebulaVideo.setDepth(-10); // Ensure it's behind everything
+                
+                // Set video properties
+                this.nebulaVideo.setVolume(0); // Mute the video
+                this.nebulaVideo.setAlpha(0.6); // More transparency to see game better
+                
+                // Try different methods to make the video work
+                this.time.delayedCall(250, () => {
+                    if (this.nebulaVideo) {
+                        console.log('[VIDEO] Attempting to play video...');
+                        
+                        // Try to get video dimensions
+                        const videoElement = this.nebulaVideo.video;
+                        if (videoElement) {
+                            // Wait for video metadata to load
+                            videoElement.addEventListener('loadedmetadata', () => {
+                                console.log('[VIDEO] Metadata loaded:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+                                
+                                // Calculate scale
+                                const scaleX = ScaleHelper.width() / videoElement.videoWidth;
+                                const scaleY = ScaleHelper.height() / videoElement.videoHeight;
+                                const scale = Math.max(scaleX, scaleY);
+                                
+                                this.nebulaVideo.setScale(scale);
+                                
+                                // Play the video (Phaser video doesn't return promise)
+                                try {
+                                    this.nebulaVideo.play();
+                                    console.log('[VIDEO] Video playing');
+                                } catch (error) {
+                                    console.log('[VIDEO] Video play failed:', error);
+                                }
+                            });
+                            
+                            // Also try to play immediately
+                            try {
+                                this.nebulaVideo.play();
+                            } catch (e) {
+                                // Ignore initial play errors
+                            }
+                        }
+                    }
+                });
+                
+                console.log('[VIDEO] Video element created');
+            } catch (error) {
+                console.error('[VIDEO] Error creating video:', error);
+            }
+        } else {
+            console.log('[VIDEO] Video not found in cache');
+        }
+        
+        // Always create these effects
+        this.createAnimatedStarfield();
+        this.createNebulaParticles();
+    }
+    
+    createGradientBackground() {
+        // Fallback gradient background
         const bg = this.add.graphics();
         bg.fillGradientStyle(0x110033, 0x220044, 0x000022, 0x330055);
         bg.fillRect(0, 0, ScaleHelper.width(), ScaleHelper.height());
-        this.createAnimatedStarfield();
-        this.createNebulaParticles();
+    }
+    
+    showPlayButton() {
+        // Show a play button if autoplay is blocked
+        const playButton = this.add.text(ScaleHelper.centerX(), ScaleHelper.centerY(), '▶ Click to Play Background', {
+            fontSize: ScaleHelper.font('24px'),
+            fill: '#ffffff',
+            backgroundColor: '#000000',
+            padding: { x: 20, y: 10 }
+        }).setOrigin(0.5).setInteractive();
+        
+        playButton.on('pointerdown', () => {
+            if (this.nebulaVideo) {
+                this.nebulaVideo.play();
+                playButton.destroy();
+            }
+        });
+    }
+    
+    reverseVideo() {
+        // Simplified for now - just loop the video
+        if (this.nebulaVideo) {
+            console.log('[VIDEO] Restarting video...');
+            this.nebulaVideo.seekTo(0);
+            this.nebulaVideo.play();
+        }
     }
     
     createAnimatedStarfield() {
@@ -1934,12 +2029,12 @@ class GameArenaScene extends BaseScene {
             this.gameStateIndicator.destroy();
         }
         
-        this.gameStateIndicator = this.add.text(400, 200, text, {
-            fontSize: '48px',
+        this.gameStateIndicator = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(200), text, {
+            fontSize: ScaleHelper.font('48px'),
             fontWeight: 'bold',
             fill: color,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 4
+            strokeThickness: ScaleHelper.scale(4)
         }).setOrigin(0.5);
         
         // Fade out "GO!" text after showing
@@ -1982,12 +2077,12 @@ class GameArenaScene extends BaseScene {
         }
         
         // Create countdown display
-        this.countdownText = this.add.text(400, 200, 'Get Ready!', {
-            fontSize: '48px',
+        this.countdownText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(200), 'Get Ready!', {
+            fontSize: ScaleHelper.font('48px'),
             fontWeight: 'bold',
             fill: GAME_CONSTANTS.UI.COLORS.WARNING,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: 4
+            strokeThickness: ScaleHelper.scale(4)
         }).setOrigin(0.5);
         
         let timeLeft = Math.ceil(warmupTime / 1000);
@@ -2369,5 +2464,33 @@ class GameArenaScene extends BaseScene {
         if (delta.nebulaCore && this.updateNebulaCoreControl) {
             this.updateNebulaCoreControl(delta.nebulaCore);
         }
+    }
+    
+    shutdown() {
+        // Clean up video resources
+        if (this.nebulaVideo) {
+            this.nebulaVideo.stop();
+            this.nebulaVideo.destroy();
+            this.nebulaVideo = null;
+        }
+        
+        if (this.reverseVideoTimer) {
+            this.reverseVideoTimer.destroy();
+            this.reverseVideoTimer = null;
+        }
+        
+        // Clean up socket listeners
+        if (this.game.socket) {
+            this.game.socket.off('gameState');
+            this.game.socket.off('playerJoined');
+            this.game.socket.off('playerLeft');
+            this.game.socket.off('roundComplete');
+            this.game.socket.off('gameOver');
+            this.game.socket.off('wallCreated');
+            this.game.socket.off('wallRemoved');
+        }
+        
+        // Call parent shutdown
+        super.shutdown();
     }
 }

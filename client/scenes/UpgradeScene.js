@@ -86,8 +86,8 @@ class UpgradeScene extends Phaser.Scene {
 
         this.createUpgradeCards(isWinner);
 
-        // Ready button (disabled until upgrade selected)
-        this.readyButton = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(353), '← Select an Upgrade/Curse Above →', {
+        // Ready button (disabled until upgrade selected) - moved down to avoid overlap
+        this.readyButton = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(420), '← Select an Upgrade/Curse Above →', {
             fontSize: ScaleHelper.font('18px'), 
             fill: '#666666',
             backgroundColor: '#222222',
@@ -95,7 +95,7 @@ class UpgradeScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         // Text for selection feedback
-        this.selectedUpgradeText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(326), '', {
+        this.selectedUpgradeText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(390), '', {
             fontSize: ScaleHelper.font('14px'),
             fill: '#ffffff'
         }).setOrigin(0.5);
@@ -261,11 +261,11 @@ class UpgradeScene extends Phaser.Scene {
     }
 
     createStatsSummary() {
-        // Position stats panel on the right side
-        const statsWidth = ScaleHelper.scale(200);
+        // Position stats panel on the right side with more separation from cards
+        const statsWidth = ScaleHelper.scale(180);
         const statsHeight = ScaleHelper.scale(120);
-        const statsX = ScaleHelper.width() - statsWidth - ScaleHelper.scale(40);
-        const statsY = ScaleHelper.y(80);
+        const statsX = ScaleHelper.width() - statsWidth - ScaleHelper.scale(30);
+        const statsY = ScaleHelper.y(40);
         const statsPanel = this.add.graphics();
         statsPanel.fillStyle(0x1a1a1a, 0.9);
         statsPanel.fillRoundedRect(statsX, statsY, statsWidth, statsHeight, ScaleHelper.scale(10));

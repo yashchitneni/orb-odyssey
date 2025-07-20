@@ -55,6 +55,21 @@ class Preloader extends BaseScene {
         // Check if nebula image exists in assets folder
         this.load.image('nebula', 'assets/nebula.png');
         
+        // Load nebula video for game arena background
+        console.log('[PRELOADER] Attempting to load video: assets/backgrounds/nebula.mp4');
+        this.load.video('nebulaVideo', 'assets/backgrounds/nebula.mp4', 'loadeddata', false, true);
+        
+        // Add load event listeners for debugging
+        this.load.on('filecomplete-video-nebulaVideo', () => {
+            console.log('[PRELOADER] Video loaded successfully!');
+        });
+        
+        this.load.on('loaderror', (file) => {
+            if (file.key === 'nebulaVideo') {
+                console.error('[PRELOADER] Failed to load video:', file.src, file);
+            }
+        });
+        
         // Since we don't have actual asset files, we'll create placeholders
         // In production, you would load actual sprite files here
         
