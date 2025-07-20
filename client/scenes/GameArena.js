@@ -726,8 +726,35 @@ class GameArenaScene extends BaseScene {
     addPlayer(playerId, playerData) {
         if (this.players[playerId]) return;
 
-        const orb = this.add.sprite(playerData.x, playerData.y, 'orb');
-        orb.setTint(playerData.color || 0x00ff00);
+        // Deterministic orb selection based on player ID
+        // This ensures the same player gets the same orb sprite across all clients
+        let orbNumber = playerData.orbNumber;
+        if (!orbNumber) {
+            // Create a simple hash from the player ID to get a consistent number 1-3
+            let hash = 0;
+            for (let i = 0; i < playerId.length; i++) {
+                hash = ((hash << 5) - hash) + playerId.charCodeAt(i);
+                hash = hash & hash; // Convert to 32-bit integer
+            }
+            orbNumber = (Math.abs(hash) % 3) + 1; // Results in 1, 2, or 3
+        }
+        const orbTexture = `orb${orbNumber}`;
+        
+        let orb;
+        
+        // Try to use the orb sprite image, fall back to circle if not loaded
+        if (this.textures.exists(orbTexture)) {
+            console.log(`[GameArena] Creating player ${playerId} with sprite: ${orbTexture}`);
+            orb = this.add.sprite(playerData.x, playerData.y, orbTexture);
+            orb.setScale(0.05); // Much smaller scale - adjust as needed
+            orb.orbNumber = orbNumber; // Store for consistency
+        } else {
+            console.log(`[GameArena] Sprite ${orbTexture} not found, using fallback circle for player ${playerId}`);
+            // Fallback to colored circle
+            orb = this.add.circle(playerData.x, playerData.y, ScaleHelper.scale(20), playerData.color || 0x00ff00);
+            orb.radius = ScaleHelper.scale(20); // Store radius for particle calculations
+        }
+        
         orb.setOrigin(0.5);
         
         // Add player name label
@@ -973,10 +1000,14 @@ class GameArenaScene extends BaseScene {
             const levelConfig = GAME_CONSTANTS.LEVELS;
             const sizeMultiplier = levelConfig.SIZE_MULTIPLIERS[level - 1] || 1;
             
+            // Adjust scale based on whether it's a sprite or circle
+            const baseScale = player.texture ? 0.05 : 1; // Sprites need MUCH smaller base scale
+            const targetScale = baseScale * sizeMultiplier;
+            
             // Smooth size transition
             this.tweens.add({
                 targets: player,
-                scale: sizeMultiplier,
+                scale: targetScale,
                 duration: GAME_CONSTANTS.VISUAL_EFFECTS.ANIMATIONS.ORB_SIZE_TRANSITION.DURATION,
                 ease: GAME_CONSTANTS.VISUAL_EFFECTS.ANIMATIONS.ORB_SIZE_TRANSITION.EASE
             });
@@ -1015,7 +1046,17 @@ class GameArenaScene extends BaseScene {
         for (let i = 0; i < particleCount; i++) {
             const particle = this.add.circle(player.x, player.y, 3, 0xffffff);
             particle.angle = (i / particleCount) * 360;
-            const baseRadius = (player.width * player.scaleX) / 2; // Approximate radius from scaled sprite
+            
+            // Calculate orbit radius based on whether it's a sprite or circle
+            let baseRadius;
+            if (player.texture) {
+                // For sprites, use the texture dimensions
+                baseRadius = (player.width * player.scaleX) / 2;
+            } else {
+                // For circles, use the radius property
+                baseRadius = player.radius || ScaleHelper.scale(20);
+            }
+            
             particle.orbitRadius = baseRadius + 15;
             particles.push(particle);
         }
@@ -1236,54 +1277,47 @@ class GameArenaScene extends BaseScene {
                 this.nebulaVideo = this.add.video(ScaleHelper.centerX(), ScaleHelper.centerY(), 'nebulaVideo');
                 this.nebulaVideo.setDepth(-10); // Ensure it's behind everything
                 
-                // Set video properties
-                this.nebulaVideo.setVolume(0); // Mute the video
-                this.nebulaVideo.setAlpha(0.6); // More transparency to see game better
+                // Mute the video and set transparency
+                this.nebulaVideo.setVolume(0); 
+                this.nebulaVideo.setAlpha(0.6);
                 
-                // Try different methods to make the video work
-                this.time.delayedCall(250, () => {
-                    if (this.nebulaVideo) {
-                        console.log('[VIDEO] Attempting to play video...');
-                        
-                        // Try to get video dimensions
-                        const videoElement = this.nebulaVideo.video;
-                        if (videoElement) {
-                            // Wait for video metadata to load
-                            videoElement.addEventListener('loadedmetadata', () => {
-                                console.log('[VIDEO] Metadata loaded:', videoElement.videoWidth, 'x', videoElement.videoHeight);
-                                
-                                // Calculate scale
-                                const scaleX = ScaleHelper.width() / videoElement.videoWidth;
-                                const scaleY = ScaleHelper.height() / videoElement.videoHeight;
-                                const scale = Math.max(scaleX, scaleY);
-                                
-                                this.nebulaVideo.setScale(scale);
-                                
-                                // Play the video (Phaser video doesn't return promise)
-                                try {
-                                    this.nebulaVideo.play();
-                                    console.log('[VIDEO] Video playing');
-                                } catch (error) {
-                                    console.log('[VIDEO] Video play failed:', error);
-                                }
-                            });
-                            
-                            // Also try to play immediately
-                            try {
-                                this.nebulaVideo.play();
-                            } catch (e) {
-                                // Ignore initial play errors
-                            }
-                        }
-                    }
-                });
+                const videoElement = this.nebulaVideo.video;
+
+                // Function to scale the video correctly once its metadata is loaded
+                const scaleVideo = () => {
+                    if (!videoElement || videoElement.videoWidth === 0) return; // Video not ready
+                    console.log('[VIDEO] Metadata loaded:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+                    const scaleX = ScaleHelper.width() / videoElement.videoWidth;
+                    const scaleY = ScaleHelper.height() / videoElement.videoHeight;
+                    const scale = Math.max(scaleX, scaleY);
+                    this.nebulaVideo.setScale(scale);
+                };
+
+                // Check if metadata is already loaded or wait for it
+                if (videoElement && videoElement.readyState >= videoElement.HAVE_METADATA) {
+                    scaleVideo();
+                } else if (videoElement) {
+                    videoElement.addEventListener('loadedmetadata', scaleVideo, { once: true });
+                }
+
+                // Attempt to play the video with looping enabled
+                console.log('[VIDEO] Attempting to play video...');
                 
-                console.log('[VIDEO] Video element created');
+                // Phaser 3 video play method - pass true to loop
+                try {
+                    this.nebulaVideo.play(true); // 'true' makes the video loop
+                    console.log('[VIDEO] Video playback started with loop enabled.');
+                } catch (error) {
+                    console.error('[VIDEO] Could not play video automatically:', error);
+                    // If autoplay fails, show a button for the user to start it manually
+                    this.showPlayButton();
+                }
+
             } catch (error) {
-                console.error('[VIDEO] Error creating video:', error);
+                console.error('[VIDEO] Error creating video object:', error);
             }
         } else {
-            console.log('[VIDEO] Video not found in cache');
+            console.log('[VIDEO] Video asset not found in cache. Using fallback background.');
         }
         
         // Always create these effects
@@ -1309,20 +1343,12 @@ class GameArenaScene extends BaseScene {
         
         playButton.on('pointerdown', () => {
             if (this.nebulaVideo) {
-                this.nebulaVideo.play();
+                this.nebulaVideo.play(true); // Pass true to ensure it loops
                 playButton.destroy();
             }
         });
     }
     
-    reverseVideo() {
-        // Simplified for now - just loop the video
-        if (this.nebulaVideo) {
-            console.log('[VIDEO] Restarting video...');
-            this.nebulaVideo.seekTo(0);
-            this.nebulaVideo.play();
-        }
-    }
     
     createAnimatedStarfield() {
         const starConfig = GAME_CONSTANTS.VISUAL_EFFECTS.ENVIRONMENT.STARS;

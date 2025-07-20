@@ -70,6 +70,23 @@ class Preloader extends BaseScene {
             }
         });
         
+        // Load orb sprites for players
+        console.log('[PRELOADER] Loading orb sprites...');
+        this.load.image('orb1', 'assets/sprites/orb1.png');
+        this.load.image('orb2', 'assets/sprites/orb2.png');
+        this.load.image('orb3', 'assets/sprites/orb3.png');
+        
+        // Add load event listeners for orb sprites
+        this.load.on('filecomplete-image-orb1', () => {
+            console.log('[PRELOADER] orb1.png loaded successfully!');
+        });
+        this.load.on('filecomplete-image-orb2', () => {
+            console.log('[PRELOADER] orb2.png loaded successfully!');
+        });
+        this.load.on('filecomplete-image-orb3', () => {
+            console.log('[PRELOADER] orb3.png loaded successfully!');
+        });
+        
         // Since we don't have actual asset files, we'll create placeholders
         // In production, you would load actual sprite files here
         
