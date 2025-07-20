@@ -76,6 +76,7 @@ class GameArenaScene extends BaseScene {
     }
 
     preload() {
+        this.load.video('nebulaVideo', 'assets/backgrounds/nebula.mp4', 'loadeddata', false, true);
         this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         this.audioManager = new AudioManager(this);
         // Simplified performance monitoring
@@ -613,6 +614,17 @@ class GameArenaScene extends BaseScene {
 
         this.game.socket.on('warmupEnd', () => {
             this.gamePhase = 'playing';
+
+            // Explicitly destroy countdown elements to prevent overlap
+            if (this.countdownText) {
+                this.countdownText.destroy();
+                this.countdownText = null;
+            }
+            if (this.countdownTimer) {
+                this.countdownTimer.destroy();
+                this.countdownTimer = null;
+            }
+
             this.showGameStateIndicator('playing');
             this.audioManager.playGameStartSound();
         });
@@ -681,14 +693,17 @@ class GameArenaScene extends BaseScene {
         }
 
         // Update game phase
-        if (data.gamePhase) {
+        if (data.gamePhase && this.gamePhase !== data.gamePhase) {
             this.gamePhase = data.gamePhase;
             this.showGameStateIndicator(this.gamePhase);
             
             // Start countdown for warmup
-            if (data.gamePhase === 'warmup' && data.warmupTime) {
+            if (this.gamePhase === 'warmup' && data.warmupTime) {
                 this.startWarmupCountdown(data.warmupTime);
             }
+        } else if (data.gamePhase) {
+            // If phase is the same, just update internal state without triggering new animations
+            this.gamePhase = data.gamePhase;
         }
 
         // Update nebula core
@@ -2039,14 +2054,17 @@ class GameArenaScene extends BaseScene {
         
         // Fade out "GO!" text after showing
         if (state === 'playing') {
+            this.gameStateIndicator.setScale(0.5);
             this.tweens.add({
                 targets: this.gameStateIndicator,
                 alpha: 0,
-                duration: 2000,
-                delay: 1000,
+                scale: 2.5,
+                duration: 1500,
+                ease: 'Cubic.easeOut',
                 onComplete: () => {
                     if (this.gameStateIndicator) {
                         this.gameStateIndicator.destroy();
+                        this.gameStateIndicator = null;
                     }
                 }
             });
