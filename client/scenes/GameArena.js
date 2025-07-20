@@ -164,26 +164,7 @@ class GameArenaScene extends BaseScene {
             strokeThickness: ScaleHelper.scale(2)
         }).setOrigin(0.5, 0);
         
-        // Round indicator with target crystal
-        this.roundText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(40), `Round ${this.round || 1} / 5`, {
-            fontSize: ScaleHelper.font('16px'),
-            fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
-            stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: ScaleHelper.scale(2)
-        }).setOrigin(0.5, 0);
-        
-        // Target crystal display
-        this.targetCrystalText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(60), 'Collect: ', {
-            fontSize: ScaleHelper.font('14px'),
-            fill: GAME_CONSTANTS.UI.COLORS.WARNING,
-            stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
-            strokeThickness: ScaleHelper.scale(2)
-        }).setOrigin(1, 0);
-        
-        // Target crystal sprite (will be set when round starts)
-        this.targetCrystalSprite = this.add.sprite(ScaleHelper.centerX() + ScaleHelper.scale(10), ScaleHelper.y(68), 'crystal');
-        this.targetCrystalSprite.setScale(0.08);
-        this.targetCrystalSprite.setVisible(false);
+        // Note: Round and target crystal display will be created in createWinConditionPanel
 
         // Connection status
         this.connectionStatus = this.add.text(ScaleHelper.x(15), ScaleHelper.height() - ScaleHelper.scale(30), '● Connected', {
@@ -337,7 +318,7 @@ class GameArenaScene extends BaseScene {
             // Add pulsing effect to target crystal display
             this.tweens.add({
                 targets: this.targetCrystalSprite,
-                scale: 0.1,
+                scale: { from: 0.06, to: 0.08 },
                 duration: 1000,
                 yoyo: true,
                 repeat: -1,
@@ -346,6 +327,27 @@ class GameArenaScene extends BaseScene {
         }
         
         console.log(`[GameArena] Target crystal for round ${this.round}: ${this.targetCrystalType}`);
+    }
+    
+    updateTargetCrystalDisplay() {
+        // Update the target crystal sprite display
+        if (this.targetCrystalSprite && this.textures.exists(this.targetCrystalType)) {
+            this.targetCrystalSprite.setTexture(this.targetCrystalType);
+            this.targetCrystalSprite.setVisible(true);
+            
+            // Clear any existing tweens on the sprite
+            this.tweens.killTweensOf(this.targetCrystalSprite);
+            
+            // Add pulsing effect
+            this.tweens.add({
+                targets: this.targetCrystalSprite,
+                scale: { from: 0.06, to: 0.08 },
+                duration: 1000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
     }
 
     setupControls() {
@@ -591,12 +593,9 @@ class GameArenaScene extends BaseScene {
         });
 
         this.game.socket.on('crystalCollected', (data) => {
-            const crystal = this.crystals[data.crystalId];
-            const wasTargetCrystal = crystal && crystal.isTargetCrystal;
-            
             this.removeCrystal(data.crystalId);
             
-            // Only update crystals if it was the target type (server should handle this logic)
+            // Update crystals based on server data
             if (data.crystalsCollected !== undefined) {
                 this.updatePlayerCrystals(data.playerId, data.crystalsCollected);
             }
@@ -604,11 +603,13 @@ class GameArenaScene extends BaseScene {
             // Safeguard: Only create effect if position data exists
             if (data.position && data.position.x !== undefined && data.position.y !== undefined) {
                 if (data.playerId === this.myId) {
-                    // Show feedback for collecting wrong crystal
-                    if (!wasTargetCrystal && !data.isPowerCrystal) {
-                        this.createFloatingText(data.position.x, data.position.y, 'Wrong Crystal!', '#ff0000', '16px');
-                    } else if (wasTargetCrystal) {
-                        this.createFloatingText(data.position.x, data.position.y, '+1 Crystal!', '#00ff00', '18px');
+                    // Show feedback based on whether points were awarded (with quickFade)
+                    if (!data.pointsAwarded) {
+                        this.createFloatingText(data.position.x, data.position.y, 'Wrong Crystal!', '#ff0000', '16px', true);
+                    } else if (data.isPowerCrystal) {
+                        this.createFloatingText(data.position.x, data.position.y, `+${data.value} Power Crystal!`, '#ff00ff', '20px', true);
+                    } else {
+                        this.createFloatingText(data.position.x, data.position.y, '+1 Crystal!', '#00ff00', '18px', true);
                     }
                 }
                 this.createCrystalCollectionEffect(data.position, data.isPowerCrystal);
@@ -748,6 +749,19 @@ class GameArenaScene extends BaseScene {
         // Update game time
         if (data.gameTime !== undefined) {
             this.updateGameTime(data.gameTime);
+        }
+        
+        // Update target crystal type if it changed
+        if (data.targetCrystalType && data.targetCrystalType !== this.targetCrystalType) {
+            this.targetCrystalType = data.targetCrystalType;
+            this.updateTargetCrystalDisplay();
+            console.log(`[GameArena] Target crystal updated to: ${this.targetCrystalType}`);
+        }
+        
+        // Update round display
+        if (data.currentRound && this.roundInfoText) {
+            this.round = data.currentRound;
+            this.roundInfoText.setText(`Round ${this.round} / 5`);
         }
 
         // Update player's own data
@@ -1578,15 +1592,20 @@ class GameArenaScene extends BaseScene {
         });
     }
     
-    createFloatingText(x, y, text, color = '#ffffff', size = '24px') {
+    createFloatingText(x, y, text, color = '#ffffff', size = '24px', quickFade = false) {
         const config = GAME_CONSTANTS.VISUAL_EFFECTS.ANIMATIONS.FLOATING_TEXT;
         const floatingText = this.add.text(x, y, text, {
             fontSize: ScaleHelper.font(size), fill: color, fontWeight: 'bold',
             stroke: '#000000', strokeThickness: ScaleHelper.scale(2)
         }).setOrigin(0.5);
+        
+        // Use shorter duration for crystal collection feedback
+        const duration = quickFade ? 800 : config.DURATION;
+        const fadeDelay = quickFade ? 200 : config.FADE_DELAY;
+        
         this.tweens.add({
             targets: floatingText, y: y - ScaleHelper.scale(config.RISE_DISTANCE), alpha: 0,
-            duration: config.DURATION, delay: config.FADE_DELAY, ease: 'Power2',
+            duration: duration, delay: fadeDelay, ease: 'Power2',
             onComplete: () => {
                 floatingText.destroy();
                 this.floatingTexts = this.floatingTexts.filter(t => t !== floatingText);
@@ -1857,21 +1876,50 @@ class GameArenaScene extends BaseScene {
         this.winPanel.lineStyle(ScaleHelper.scale(2), 0xff00ff);
         this.winPanel.strokeRoundedRect(x, y, panelWidth, panelHeight, ScaleHelper.scale(12));
         
+        // Set depth to ensure panel is behind text
+        this.winPanel.setDepth(0);
+        
         // Round Info Text
-        this.roundInfoText = this.add.text(ScaleHelper.centerX(), y + ScaleHelper.scale(20), `Round ${this.currentRound} / 5`, {
+        this.roundInfoText = this.add.text(ScaleHelper.centerX(), y + ScaleHelper.scale(20), `Round ${this.round || 1} / 5`, {
             fontSize: ScaleHelper.font('22px'),
             fontFamily: 'Arial Black',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
             strokeThickness: ScaleHelper.scale(2)
-        }).setOrigin(0.5);
+        }).setOrigin(0.5).setDepth(10);
 
-        // Win condition text
-        this.winConditionText = this.add.text(ScaleHelper.centerX(), y + ScaleHelper.scale(45), `First to ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET} crystals wins!`, {
+        // Win condition container with text and crystal sprite
+        const winConditionY = y + ScaleHelper.scale(42);
+        
+        // Create container for the win condition elements
+        this.winConditionContainer = this.add.container(ScaleHelper.centerX(), winConditionY);
+        this.winConditionContainer.setDepth(10);
+        
+        // "Collect 10" text
+        this.collectText = this.add.text(-ScaleHelper.scale(80), 0, `Collect ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET}`, {
             fontSize: ScaleHelper.font('16px'),
             fontFamily: 'Arial',
-            fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
-        }).setOrigin(0.5);
+            fill: '#f5f5dc', // Cream/beige color
+            stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
+            strokeThickness: ScaleHelper.scale(1)
+        }).setOrigin(0.5, 0.5);
+        
+        // Target crystal sprite (positioned after "Collect 10")
+        this.targetCrystalSprite = this.add.sprite(-ScaleHelper.scale(10), 0, 'crystal');
+        this.targetCrystalSprite.setScale(0.06);
+        this.targetCrystalSprite.setVisible(false);
+        
+        // "crystals to win!" text
+        this.crystalsToWinText = this.add.text(ScaleHelper.scale(65), 0, 'crystals to win!', {
+            fontSize: ScaleHelper.font('16px'),
+            fontFamily: 'Arial',
+            fill: '#f5f5dc', // Cream/beige color
+            stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
+            strokeThickness: ScaleHelper.scale(1)
+        }).setOrigin(0.5, 0.5);
+        
+        // Add all elements to the container
+        this.winConditionContainer.add([this.collectText, this.targetCrystalSprite, this.crystalsToWinText]);
     }
     
     updateWinConditionPanel() {

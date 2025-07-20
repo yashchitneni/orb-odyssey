@@ -223,7 +223,9 @@ class Room {
             roundWinners: [],
             playerUpgrades: {},
             seriesScores: {},
-            playersReady: {}
+            playersReady: {},
+            targetCrystalType: null,
+            crystalTypes: ['crystal', 'crystal1', 'crystal2', 'crystal3', 'crystal4', 'crystal5']
         };
     }
     
@@ -269,6 +271,11 @@ class Room {
                 this.gameState.seriesScores[playerId] = 0;
             }
         }
+        
+        // Set target crystal type for this round (deterministic based on round number)
+        const targetIndex = (this.gameState.currentRound - 1) % this.gameState.crystalTypes.length;
+        this.gameState.targetCrystalType = this.gameState.crystalTypes[targetIndex];
+        console.log(`[ROOM ${this.id}] Round ${this.gameState.currentRound} - Target crystal: ${this.gameState.targetCrystalType}`);
         
         // Initialize game objects for this room
         this.initializeOrbs();
@@ -465,29 +472,42 @@ class Room {
                 
                 if (distance < GAME_CONSTANTS.PLAYER_RADIUS + GAME_CONSTANTS.CRYSTAL_RADIUS) {
                     // Collect crystal
-                    player.score += crystal.value;
-                    player.crystalsCollected += 1;
-                    
                     const crystalPosition = { x: crystal.x, y: crystal.y };
                     
-                    // Check for level up
-                    const previousLevel = player.level;
-                    let newLevel = 1;
-                    if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[3]) { // 80 for L4
-                        newLevel = 4;
-                    } else if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[2]) { // 50 for L3
-                        newLevel = 3;
-                    } else if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[1]) { // 20 for L2
-                        newLevel = 2;
+                    // Only award points if it's the target crystal type or a power crystal
+                    let pointsAwarded = false;
+                    if (crystal.isPowerCrystal || crystal.isTargetCrystal) {
+                        player.score += crystal.value;
+                        player.crystalsCollected += 1;
+                        pointsAwarded = true;
+                        console.log(`[CRYSTAL] Player ${player.name} collected ${crystal.isPowerCrystal ? 'power' : 'target'} crystal (type: ${crystal.crystalType})`);
+                    } else {
+                        console.log(`[CRYSTAL] Player ${player.name} collected wrong crystal type: ${crystal.crystalType} (target was: ${this.gameState.targetCrystalType})`);
                     }
-                    player.level = newLevel;
                     
-                    // Update abilities based on level
-                    if (player.level >= GAME_CONSTANTS.ABILITIES.BURST.UNLOCK_LEVEL) {
-                        player.abilities.burst.available = true;
-                    }
-                    if (player.level >= GAME_CONSTANTS.ABILITIES.WALL.UNLOCK_LEVEL) {
-                        player.abilities.wall.available = true;
+                    // Check for level up (only if points were awarded)
+                    const previousLevel = player.level;
+                    let leveledUp = false;
+                    
+                    if (pointsAwarded) {
+                        let newLevel = 1;
+                        if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[3]) { // 80 for L4
+                            newLevel = 4;
+                        } else if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[2]) { // 50 for L3
+                            newLevel = 3;
+                        } else if (player.crystalsCollected >= GAME_CONSTANTS.LEVELS.THRESHOLDS[1]) { // 20 for L2
+                            newLevel = 2;
+                        }
+                        player.level = newLevel;
+                        leveledUp = player.level > previousLevel;
+                        
+                        // Update abilities based on level
+                        if (player.level >= GAME_CONSTANTS.ABILITIES.BURST.UNLOCK_LEVEL) {
+                            player.abilities.burst.available = true;
+                        }
+                        if (player.level >= GAME_CONSTANTS.ABILITIES.WALL.UNLOCK_LEVEL) {
+                            player.abilities.wall.available = true;
+                        }
                     }
                     
                     // Delete crystal
@@ -498,10 +518,13 @@ class Room {
                         crystalId,
                         playerId,
                         isPowerCrystal: crystal.isPowerCrystal,
+                        isTargetCrystal: crystal.isTargetCrystal,
+                        crystalType: crystal.crystalType,
+                        pointsAwarded: pointsAwarded,
                         value: crystal.value,
                         crystalsCollected: player.crystalsCollected,
                         level: player.level,
-                        leveledUp: player.level > previousLevel,
+                        leveledUp: leveledUp,
                         position: crystalPosition
                     });
                     
@@ -702,11 +725,27 @@ class Room {
         const crystalId = 'crystal_' + crystalIdCounter++;
         const isPowerCrystal = Math.random() < GAME_CONSTANTS.POWER_CRYSTAL_CHANCE;
         
+        // Assign crystal type - 40% chance of being the target crystal, 60% chance of being a decoy
+        let crystalType;
+        if (!isPowerCrystal && Math.random() < 0.4) {
+            // Make it the target crystal
+            crystalType = this.gameState.targetCrystalType;
+        } else {
+            // Make it a random crystal type (could still randomly be the target)
+            const typeIndex = Math.floor(Math.random() * this.gameState.crystalTypes.length);
+            crystalType = this.gameState.crystalTypes[typeIndex];
+        }
+        
+        // Check if this crystal is the target type
+        const isTargetCrystal = crystalType === this.gameState.targetCrystalType;
+        
         this.gameState.crystals[crystalId] = {
             id: crystalId,
             x: Math.random() * (GAME_CONSTANTS.WORLD_WIDTH - 100) + 50,
             y: Math.random() * (GAME_CONSTANTS.WORLD_HEIGHT - 100) + 50,
             isPowerCrystal: isPowerCrystal,
+            crystalType: crystalType,
+            isTargetCrystal: isTargetCrystal,
             value: isPowerCrystal ? GAME_CONSTANTS.POINTS_PER_POWER_CRYSTAL : GAME_CONSTANTS.POINTS_PER_CRYSTAL
         };
         io.to(this.id).emit('crystalSpawned', this.gameState.crystals[crystalId]);
@@ -731,7 +770,8 @@ class Room {
                     warmupTime: this.gameState.warmupTime,
                     nebulaCore: this.gameState.nebulaCore,
                     currentRound: this.gameState.currentRound,
-                    seriesScores: this.gameState.seriesScores
+                    seriesScores: this.gameState.seriesScores,
+                    targetCrystalType: this.gameState.targetCrystalType
                 });
             }
         });
@@ -799,6 +839,11 @@ class Room {
         if (this.gameState.gamePhase !== 'ended') return;
 
         this.gameState.currentRound++;
+        
+        // Set target crystal type for the new round (deterministic based on round number)
+        const targetIndex = (this.gameState.currentRound - 1) % this.gameState.crystalTypes.length;
+        this.gameState.targetCrystalType = this.gameState.crystalTypes[targetIndex];
+        console.log(`[ROOM ${this.id}] Round ${this.gameState.currentRound} - Target crystal: ${this.gameState.targetCrystalType}`);
         
         // Reset game phase and timers
         this.gameState.gameStarted = true;

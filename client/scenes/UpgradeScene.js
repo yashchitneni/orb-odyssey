@@ -107,7 +107,8 @@ class UpgradeScene extends Phaser.Scene {
             this.game.socket.once('nextRoundStart', (data) => {
                 this.scene.start('GameArenaScene', {
                     roomId: this.roomId,
-                    playerId: this.playerId
+                    playerId: this.playerId,
+                    round: data.currentRound || this.round + 1
                 });
             });
         }

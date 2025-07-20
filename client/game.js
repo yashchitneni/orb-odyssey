@@ -35,7 +35,15 @@ const game = new Phaser.Game(config);
 let socket;
 
 function connectToServer() {
-    socket = io('http://localhost:3000', {
+    // Determine server URL based on environment
+    const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const serverUrl = isDevelopment 
+        ? 'http://localhost:3000' 
+        : 'https://orb-odyssey-server.onrender.com';
+    
+    console.log(`Connecting to ${isDevelopment ? 'local' : 'production'} server:`, serverUrl);
+    
+    socket = io(serverUrl, {
         autoConnect: true,
         reconnection: true,
         reconnectionAttempts: 5,
