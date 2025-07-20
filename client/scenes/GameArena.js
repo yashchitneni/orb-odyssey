@@ -5,6 +5,7 @@ class GameArenaScene extends Phaser.Scene {
         this.orbs = {};
         this.crystals = {};
         this.myId = null;
+        this.roomId = null;
         this.trails = {};
         this.inputVector = { x: 0, y: 0 };
         this.mouseDown = false;
@@ -48,12 +49,19 @@ class GameArenaScene extends Phaser.Scene {
         this.lastInputVector = { x: 0, y: 0 };
     }
 
-    init() {
+    init(data) {
+        console.log('[GAME ARENA INIT] Received data:', data);
+        
         // Reset all game state when scene starts/restarts
         this.players = {};
         this.orbs = {};
         this.crystals = {};
-        this.myId = null;
+        this.myId = data?.playerId || null;
+        this.roomId = data?.roomId || null;
+        
+        console.log('[GAME ARENA INIT] Set myId to:', this.myId);
+        console.log('[GAME ARENA INIT] Set roomId to:', this.roomId);
+        
         this.trails = {};
         this.inputVector = { x: 0, y: 0 };
         this.walls = [];
@@ -261,21 +269,29 @@ class GameArenaScene extends Phaser.Scene {
     updateAbilityDisplay() {
         let abilityInfo = [];
         
+        // Get energy cost reduction if available
+        const player = this.players[this.myId];
+        const reduction = player?.energyCostReduction || 0;
+        
         if (this.abilities.burst.available) {
-            const burstColor = this.energy >= GAME_CONSTANTS.ABILITIES.BURST.ENERGY_COST && this.abilities.burst.cooldown === 0 ? 
+            const baseCost = GAME_CONSTANTS.ABILITIES.BURST.ENERGY_COST;
+            const actualCost = Math.floor(baseCost * (1 - reduction));
+            const burstColor = this.energy >= actualCost && this.abilities.burst.cooldown === 0 ?
                               GAME_CONSTANTS.UI.COLORS.SUCCESS : GAME_CONSTANTS.UI.COLORS.DANGER;
             const burstStatus = this.abilities.burst.cooldown > 0 ? 
                                `(${Math.ceil(this.abilities.burst.cooldown / 1000)}s)` : 
-                               this.energy >= GAME_CONSTANTS.ABILITIES.BURST.ENERGY_COST ? '(Ready)' : '(No Energy)';
+                               this.energy >= actualCost ? `(${actualCost}E)` : '(No Energy)';
             abilityInfo.push(`Q: Burst ${burstStatus}`);
         }
         
         if (this.abilities.wall.available) {
-            const wallColor = this.energy >= GAME_CONSTANTS.ABILITIES.WALL.ENERGY_COST && this.abilities.wall.cooldown === 0 ? 
+            const baseCost = GAME_CONSTANTS.ABILITIES.WALL.ENERGY_COST;
+            const actualCost = Math.floor(baseCost * (1 - reduction));
+            const wallColor = this.energy >= actualCost && this.abilities.wall.cooldown === 0 ?
                              GAME_CONSTANTS.UI.COLORS.SUCCESS : GAME_CONSTANTS.UI.COLORS.DANGER;
             const wallStatus = this.abilities.wall.cooldown > 0 ? 
                               `(${Math.ceil(this.abilities.wall.cooldown / 1000)}s)` : 
-                              this.energy >= GAME_CONSTANTS.ABILITIES.WALL.ENERGY_COST ? '(Ready)' : '(No Energy)';
+                              this.energy >= actualCost ? `(${actualCost}E)` : '(No Energy)';
             abilityInfo.push(`E: Wall ${wallStatus}`);
         }
         
@@ -374,6 +390,11 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     handlePointerDown(pointer) {
+        console.log('[INPUT] Pointer down at:', pointer.x, pointer.y);
+        console.log('[INPUT] My ID:', this.myId);
+        console.log('[INPUT] My player exists:', !!this.players[this.myId]);
+        console.log('[INPUT] Game phase:', this.gamePhase);
+        
         if (this.isMobile && this.virtualJoystick && 
             Phaser.Math.Distance.Between(pointer.x, pointer.y, this.virtualJoystick.baseX, this.virtualJoystick.baseY) < 60) {
             return;
@@ -408,7 +429,13 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     updatePlayerMovement(delta) {
-        if (!this.myId || this.gamePhase !== 'playing') return;
+        if (!this.myId || this.gamePhase !== 'playing') {
+            if (!this.lastMovementDebug || Date.now() - this.lastMovementDebug > 5000) {
+                console.log('[MOVEMENT] Blocked - myId:', this.myId, 'gamePhase:', this.gamePhase);
+                this.lastMovementDebug = Date.now();
+            }
+            return;
+        }
 
         let moveX = 0;
         let moveY = 0;
@@ -454,7 +481,12 @@ class GameArenaScene extends Phaser.Scene {
             return;
         }
 
-        const energyCost = GAME_CONSTANTS.ABILITIES[abilityType.toUpperCase()].ENERGY_COST;
+        // Get energy cost with any reductions applied
+        const baseCost = GAME_CONSTANTS.ABILITIES[abilityType.toUpperCase()].ENERGY_COST;
+        const player = this.players[this.myId];
+        const reduction = player?.energyCostReduction || 0;
+        const energyCost = Math.floor(baseCost * (1 - reduction));
+        
         if (this.energy < energyCost) {
             return;
         }
@@ -585,7 +617,10 @@ class GameArenaScene extends Phaser.Scene {
                     winner: results.winner,
                     winType: results.winType,
                     round: results.currentRound,
-                    seriesScores: results.seriesScores
+                    seriesScores: results.seriesScores,
+                    roomId: this.roomId,
+                    playerId: this.myId,
+                    myPlayerId: this.myId
                 });
             }
         });
@@ -615,10 +650,22 @@ class GameArenaScene extends Phaser.Scene {
     }
 
     updateGameState(data) {
-        this.myId = data.myId;
+        console.log('[GAME STATE] Before update - My ID:', this.myId);
+        console.log('[GAME STATE] Server sent myId:', data.myId);
+        
+        // Only update myId if the server sends a valid one
+        if (data.myId) {
+            this.myId = data.myId;
+        }
+        
+        console.log('[GAME STATE] After update - My ID:', this.myId);
+        console.log('[GAME STATE] Players received:', Object.keys(data.players));
+        console.log('[GAME STATE] Game phase:', data.gamePhase);
+        
         // Update players
         Object.keys(data.players).forEach(playerId => {
             if (!this.players[playerId]) {
+                console.log('[GAME STATE] Adding new player:', playerId, data.players[playerId].name);
                 this.addPlayer(playerId, data.players[playerId]);
             } else {
                 this.updatePlayer(playerId, data.players[playerId]);
@@ -686,8 +733,41 @@ class GameArenaScene extends Phaser.Scene {
         orb.setTint(playerData.color || 0x00ff00);
         orb.setOrigin(0.5);
         
+        // Add player name label
+        const nameText = this.add.text(playerData.x, playerData.y - 30, playerData.name || `Player ${playerId.substr(-4)}`, {
+            fontSize: '12px',
+            fill: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 2
+        }).setOrigin(0.5);
+        
+        // Add "YOU" indicator for the current player
+        if (playerId === this.myId) {
+            const youText = this.add.text(playerData.x, playerData.y - 45, 'YOU', {
+                fontSize: '14px',
+                fill: '#ffff00',
+                stroke: '#000000',
+                strokeThickness: 3,
+                fontWeight: 'bold'
+            }).setOrigin(0.5);
+            orb.youText = youText;
+            
+            // Add glowing effect for player's own orb
+            orb.setScale(1.1);
+            this.tweens.add({
+                targets: orb,
+                alpha: 0.7,
+                duration: 500,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
+        
         this.players[playerId] = orb;
+        orb.nameText = nameText;
         orb.playerId = playerId;
+        orb.playerName = playerData.name || `Player ${playerId.substr(-4)}`;
         orb.vx = playerData.vx || 0;
         orb.vy = playerData.vy || 0;
         orb.crystalsCollected = playerData.crystalsCollected || 0;
@@ -706,6 +786,18 @@ class GameArenaScene extends Phaser.Scene {
         player.vx = playerData.vx || 0;
         player.vy = playerData.vy || 0;
         
+        // Update name label position
+        if (player.nameText) {
+            player.nameText.x = player.x;
+            player.nameText.y = player.y - 30;
+        }
+        
+        // Update "YOU" text position
+        if (player.youText) {
+            player.youText.x = player.x;
+            player.youText.y = player.y - 45;
+        }
+        
         if (playerData.level !== undefined && player.level !== playerData.level) {
             this.updatePlayerLevel(playerId, playerData.level);
         }
@@ -717,7 +809,19 @@ class GameArenaScene extends Phaser.Scene {
 
     removePlayer(playerId) {
         if (this.players[playerId]) {
-            this.players[playerId].destroy();
+            const player = this.players[playerId];
+            
+            // Clean up name text
+            if (player.nameText) {
+                player.nameText.destroy();
+            }
+            
+            // Clean up "YOU" text
+            if (player.youText) {
+                player.youText.destroy();
+            }
+            
+            player.destroy();
             delete this.players[playerId];
         }
         if (this.orbTrails[playerId]) {
@@ -1536,26 +1640,55 @@ class GameArenaScene extends Phaser.Scene {
         // Clear existing list
         this.playerListContainer.removeAll(true);
         
+        // Convert to array and handle both server data and sprite objects
+        const playerArray = [];
+        Object.entries(players).forEach(([id, player]) => {
+            // Handle sprite objects (from this.players)
+            if (player.playerId) {
+                playerArray.push({
+                    id: player.playerId,
+                    name: player.playerName || `Player ${player.playerId.substr(-4)}`,
+                    level: player.level || 1,
+                    crystalsCollected: player.crystalsCollected || 0
+                });
+            } 
+            // Handle server data objects
+            else {
+                playerArray.push({
+                    id: player.id || id,
+                    name: player.name || `Player ${(player.id || id).substr(-4)}`,
+                    level: player.level || 1,
+                    crystalsCollected: player.crystalsCollected || 0
+                });
+            }
+        });
+        
+        // Sort by crystals collected
+        const sortedPlayers = playerArray.sort((a, b) => b.crystalsCollected - a.crystalsCollected);
+        
         // Add players with their stats
-        Object.values(players).forEach((player, index) => {
+        sortedPlayers.forEach((player, index) => {
             const yPos = index * 25;
-            const isMe = player.playerId === this.myId;
+            const isMe = player.id === this.myId;
+            
+            // Display text - only show "You" for the actual current player
+            const displayText = isMe ? 'You' : player.name;
             
             // Player name/indicator
-            const playerText = this.add.text(0, yPos, isMe ? 'You' : `P${index + 1}`, {
+            const playerText = this.add.text(0, yPos, displayText, {
                 fontSize: '14px',
                 fill: isMe ? GAME_CONSTANTS.UI.COLORS.WARNING : GAME_CONSTANTS.UI.COLORS.WHITE,
                 fontWeight: isMe ? 'bold' : 'normal'
             });
             
             // Level indicator
-            const levelText = this.add.text(50, yPos, `L${player.level || 1}`, {
+            const levelText = this.add.text(120, yPos, `L${player.level}`, {
                 fontSize: '12px',
-                fill: this.getLevelColor(player.level || 1)
+                fill: this.getLevelColor(player.level)
             });
             
             // Crystal count
-            const crystalText = this.add.text(80, yPos, `${player.crystalsCollected || 0}`, {
+            const crystalText = this.add.text(150, yPos, `${player.crystalsCollected}`, {
                 fontSize: '12px',
                 fill: GAME_CONSTANTS.UI.COLORS.PRIMARY
             });
@@ -1766,6 +1899,12 @@ class GameArenaScene extends Phaser.Scene {
     }
     
     showGameStateIndicator(state) {
+        // Prevent showing the same state indicator multiple times
+        if (this.lastShownGameState === state) {
+            return;
+        }
+        this.lastShownGameState = state;
+        
         let text, color;
         
         switch(state) {
@@ -1778,6 +1917,7 @@ class GameArenaScene extends Phaser.Scene {
             case 'playing':
                 text = 'GO!';
                 color = GAME_CONSTANTS.UI.COLORS.SUCCESS;
+                console.log('[GAME] Showing GO! message');
                 break;
             case 'ended':
                 text = 'ROUND ENDED';
@@ -2183,6 +2323,11 @@ class GameArenaScene extends Phaser.Scene {
                         this.energy = playerDelta.energy;
                         this.updateEnergyBar(this.energy, 100);
                     }
+                    
+                    // Store upgrade properties
+                    if (playerDelta.speedMultiplier !== undefined) player.speedMultiplier = playerDelta.speedMultiplier;
+                    if (playerDelta.crystalDropReduction !== undefined) player.crystalDropReduction = playerDelta.crystalDropReduction;
+                    if (playerDelta.energyCostReduction !== undefined) player.energyCostReduction = playerDelta.energyCostReduction;
                 }
             });
         }

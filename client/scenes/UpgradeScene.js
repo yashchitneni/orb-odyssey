@@ -11,6 +11,10 @@ class UpgradeScene extends Phaser.Scene {
         this.round = data.round || 1;
         this.playerUpgrades = data.playerUpgrades || {};
         this.seriesScores = data.seriesScores || {};
+        this.myPlayerId = this.game.socket?.id || null;
+        this.myPlayerId = data.myPlayerId || this.game.socket?.id || null;
+        this.roomId = data.roomId;
+        this.playerId = data.playerId;
     }
 
     create() {
@@ -84,6 +88,18 @@ class UpgradeScene extends Phaser.Scene {
         
         // Player stats summary
         this.createStatsSummary();
+        
+        // Listen for next round start event
+        if (this.game.socket) {
+            this.game.socket.once('nextRoundStart', (data) => {
+                console.log('Next round starting:', data);
+                // Transition to game arena with room and player data
+                this.scene.start('GameArenaScene', {
+                    roomId: this.roomId,
+                    playerId: this.playerId
+                });
+            });
+        }
     }
 
     createStarfield() {
@@ -201,33 +217,64 @@ class UpgradeScene extends Phaser.Scene {
     }
 
     createStatsSummary() {
-        // Small stats panel on the side
+        // Larger stats panel with more info
         const statsX = 50;
-        const statsY = 450;
+        const statsY = 350;
         
         const statsPanel = this.add.graphics();
         statsPanel.fillStyle(0x1a1a1a, 0.8);
-        statsPanel.fillRoundedRect(statsX, statsY, 150, 120, 8);
+        statsPanel.fillRoundedRect(statsX, statsY, 200, 200, 8);
         
-        this.add.text(statsX + 75, statsY + 15, 'Your Stats', {
+        this.add.text(statsX + 100, statsY + 15, 'Your Round Stats', {
             fontSize: '16px',
             fontWeight: 'bold',
             fill: '#ffffff'
         }).setOrigin(0.5);
         
-        // Show some interesting stats from the round
-        const myStats = this.results.find(p => p.id === this.game.socket?.id);
+        // Show detailed stats from the round
+        const myStats = this.results.find(p => p.id === this.myPlayerId);
         if (myStats) {
-            const statsText = `Crystals: ${myStats.crystalsCollected}
-Level: ${myStats.level}
-Score: ${myStats.score}`;
+            let statsText = `Crystals Collected: ${myStats.crystalsCollected || 0}
+Max Level: ${myStats.maxLevel || myStats.level || 1}
+Score: ${myStats.score || 0}`;
+            
+            // Add additional stats if available
+            if (myStats.totalCrystalsDropped !== undefined) {
+                statsText += `\nCrystals Lost: ${myStats.totalCrystalsDropped}`;
+            }
+            if (myStats.abilitiesUsed !== undefined) {
+                statsText += `\nAbilities Used: ${myStats.abilitiesUsed}`;
+            }
+            if (myStats.totalDistanceTraveled !== undefined) {
+                const distance = Math.floor(myStats.totalDistanceTraveled / 100);
+                statsText += `\nDistance: ${distance}m`;
+            }
+            
+            // Show current upgrades
+            if (myStats.upgrades && myStats.upgrades.length > 0) {
+                statsText += '\n\nCurrent Upgrades:';
+                myStats.upgrades.forEach(upgrade => {
+                    const upgradeName = this.getUpgradeName(upgrade.upgradeId);
+                    statsText += `\n• ${upgradeName}`;
+                });
+            }
             
             this.add.text(statsX + 10, statsY + 35, statsText, {
-                fontSize: '12px',
+                fontSize: '11px',
                 fill: '#aaaaaa',
-                lineSpacing: 5
+                lineSpacing: 4,
+                wordWrap: { width: 180 }
             });
         }
+    }
+    
+    getUpgradeName(upgradeId) {
+        const names = {
+            'kinetic_plating': 'Kinetic Plating',
+            'warp_coil': 'Warp Coil',
+            'efficiency_matrix': 'Efficiency Matrix'
+        };
+        return names[upgradeId] || upgradeId;
     }
 
     selectUpgrade(upgrade) {
@@ -263,12 +310,6 @@ Score: ${myStats.score}`;
             this.readyButton.setText('Waiting for other players...');
             this.readyButton.setFill('#888888');
             this.readyButton.disableInteractive();
-            
-            // Listen for next round start
-            this.game.socket.once('nextRoundStart', (data) => {
-                // Transition to game arena
-                this.scene.start('GameArenaScene');
-            });
         }
     }
 }

@@ -3,6 +3,16 @@ class LobbyScene extends Phaser.Scene {
         super({ key: 'LobbyScene' });
         this.players = [];
         this.audioManager = null;
+        this.roomId = null;
+        this.playerId = null;
+        this.isHost = false;
+    }
+
+    init(data) {
+        this.roomId = data.roomId;
+        this.playerId = data.playerId;
+        this.isHost = data.isHost || false;
+        this.isConnected = true; // Track connection status
     }
 
     create() {
@@ -33,16 +43,45 @@ class LobbyScene extends Phaser.Scene {
         this.createGameInfoPanel();
 
         if (this.game.socket) {
+            // Remove any existing listeners to prevent duplicates
+            this.game.socket.off('playerList');
+            this.game.socket.off('gameStart');
+            this.game.socket.off('playerLeft');
+            
             this.game.socket.on('playerList', (players) => {
+                console.log('Received player list:', players);
                 this.updatePlayerList(players);
             });
 
             this.game.socket.on('gameStart', () => {
+                console.log('[LOBBY] Game starting! Room:', this.roomId, 'Player:', this.playerId);
                 this.audioManager.stopMusic();
-                this.scene.start('GameArenaScene');
+                this.scene.start('GameArenaScene', {
+                    roomId: this.roomId,
+                    playerId: this.playerId
+                });
             });
-
-            this.game.socket.emit('joinLobby');
+            
+            this.game.socket.on('playerLeft', (playerId) => {
+                console.log('Player left:', playerId);
+                // Request updated player list
+                if (this.game.socket.connected) {
+                    this.game.socket.emit('requestPlayerList');
+                }
+            });
+            
+            // Request player list on scene start
+            console.log('Requesting initial player list for room:', this.roomId);
+            this.game.socket.emit('requestPlayerList');
+            
+            // Add connection status listeners
+            this.game.socket.on('connect', () => {
+                this.updateConnectionStatus(true);
+            });
+            
+            this.game.socket.on('disconnect', () => {
+                this.updateConnectionStatus(false);
+            });
         }
     }
 
@@ -179,7 +218,7 @@ class LobbyScene extends Phaser.Scene {
     
     createTitle() {
         // Main title
-        this.titleText = this.add.text(400, 100, 'ORB ODYSSEY', {
+        this.titleText = this.add.text(400, 80, 'ORB ODYSSEY', {
             ...GAME_CONSTANTS.UI.FONTS.TITLE,
             fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
@@ -205,10 +244,17 @@ class LobbyScene extends Phaser.Scene {
         });
         
         // Subtitle
-        this.add.text(400, 150, 'Multiplayer Crystal Collection Arena', {
+        this.add.text(400, 130, 'Multiplayer Crystal Collection Arena', {
             ...GAME_CONSTANTS.UI.FONTS.SUBTITLE,
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
             fontStyle: 'italic'
+        }).setOrigin(0.5);
+        
+        // Room ID
+        this.add.text(400, 160, `Room: ${this.roomId}`, {
+            fontSize: '20px',
+            fill: '#ffff00',
+            fontWeight: 'bold'
         }).setOrigin(0.5);
     }
     
@@ -390,6 +436,38 @@ E - Wall (L4+)`;
             fontSize: '12px',
             fill: GAME_CONSTANTS.UI.COLORS.SUCCESS
         });
+        
+        // Back to menu button
+        this.createBackButton();
+    }
+    
+    createBackButton() {
+        const backButton = this.add.text(700, 30, '← Back to Menu', {
+            fontSize: '16px',
+            fill: '#ffff00',
+            backgroundColor: '#333300',
+            padding: { x: 10, y: 5 }
+        });
+        
+        backButton.setInteractive();
+        
+        backButton.on('pointerover', () => {
+            this.audioManager.playUISound('hover');
+            backButton.setScale(1.05);
+        });
+        
+        backButton.on('pointerout', () => {
+            backButton.setScale(1);
+        });
+        
+        backButton.on('pointerdown', () => {
+            this.audioManager.playUISound('click');
+            if (this.game.socket) {
+                this.game.socket.emit('leaveRoom');
+            }
+            this.audioManager.stopMusic();
+            this.scene.start('MainMenuScene');
+        });
     }
 
     updatePlayerList(players) {
@@ -406,10 +484,12 @@ E - Wall (L4+)`;
                 // Player indicator circle
                 const indicator = this.add.circle(0, yPos + 10, 8, player.color || 0x00ff00);
                 
-                // Player name
-                const nameText = this.add.text(20, yPos, player.name || `Player ${index + 1}`, {
+                // Player name with host indicator
+                const isHost = index === 0; // First player in list is the host
+                const namePrefix = isHost ? '👑 ' : '';
+                const nameText = this.add.text(20, yPos, namePrefix + (player.name || `Player ${index + 1}`), {
                     fontSize: '16px',
-                    fill: GAME_CONSTANTS.UI.COLORS.WHITE,
+                    fill: isHost ? '#ffd700' : GAME_CONSTANTS.UI.COLORS.WHITE,
                     fontWeight: 'bold'
                 });
                 
@@ -428,14 +508,47 @@ E - Wall (L4+)`;
                 this.playerListContainer.add([indicator, nameText, statusText, readyIndicator]);
             });
             
-            // Update start button availability
-            const canStart = players.length >= 1; // Minimum players
-            this.startButtonGlow.setVisible(canStart);
-            this.startButtonBg.setAlpha(canStart ? 1 : 0.5);
-            this.startButtonText.setAlpha(canStart ? 1 : 0.5);
+            // Update start button based on multiple conditions
+            let buttonText = 'START GAME';
+            let canInteract = false;
+            let buttonAlpha = 0.5;
+            
+            if (!this.isConnected) {
+                buttonText = 'Disconnected';
+                canInteract = false;
+                buttonAlpha = 0.3;
+            } else if (!this.isHost) {
+                buttonText = 'Waiting for Host';
+                canInteract = false;
+                buttonAlpha = 0.5;
+            } else if (players.length < 2) {
+                buttonText = 'Waiting for Players...';
+                canInteract = false;
+                buttonAlpha = 0.5;
+            } else {
+                // Host with enough players
+                buttonText = 'START GAME';
+                canInteract = true;
+                buttonAlpha = 1;
+            }
+            
+            // Update button appearance
+            this.startButtonText.setText(buttonText);
+            this.startButtonGlow.setVisible(canInteract);
+            this.startButtonBg.setAlpha(buttonAlpha);
+            this.startButtonText.setAlpha(buttonAlpha);
+            
+            // Update button interactivity
+            if (canInteract) {
+                this.startButtonBg.setInteractive();
+                this.startButtonText.setInteractive();
+            } else {
+                this.startButtonBg.disableInteractive();
+                this.startButtonText.disableInteractive();
+            }
             
             // Update status text
-            if (canStart) {
+            if (canInteract && players.length >= 2) {
                 this.statusText.setText('Ready to start!');
                 this.statusText.setFill(GAME_CONSTANTS.UI.COLORS.SUCCESS);
                 this.waitingTimer?.destroy();
@@ -454,9 +567,16 @@ E - Wall (L4+)`;
     }
     
     updateConnectionStatus(connected) {
+        this.isConnected = connected;
+        
         if (this.connectionStatus) {
             this.connectionStatus.setText(connected ? '● Connected' : '● Disconnected');
             this.connectionStatus.setFill(connected ? GAME_CONSTANTS.UI.COLORS.SUCCESS : GAME_CONSTANTS.UI.COLORS.DANGER);
+        }
+        
+        // Update start button to reflect connection status
+        if (this.players && this.startButtonText) {
+            this.updatePlayerList(this.players);
         }
     }
     
@@ -489,6 +609,9 @@ E - Wall (L4+)`;
         if (this.game.socket) {
             this.game.socket.off('playerList');
             this.game.socket.off('gameStart');
+            this.game.socket.off('playerLeft');
+            this.game.socket.off('connect');
+            this.game.socket.off('disconnect');
         }
     }
 }
