@@ -318,7 +318,7 @@ class GameArenaScene extends BaseScene {
             // Add pulsing effect to target crystal display
             this.tweens.add({
                 targets: this.targetCrystalSprite,
-                scale: { from: 0.06, to: 0.08 },
+                scale: { from: 0.18, to: 0.22 },
                 duration: 1000,
                 yoyo: true,
                 repeat: -1,
@@ -341,7 +341,7 @@ class GameArenaScene extends BaseScene {
             // Add pulsing effect
             this.tweens.add({
                 targets: this.targetCrystalSprite,
-                scale: { from: 0.06, to: 0.08 },
+                scale: { from: 0.18, to: 0.22 },
                 duration: 1000,
                 yoyo: true,
                 repeat: -1,
@@ -1865,9 +1865,9 @@ class GameArenaScene extends BaseScene {
     // Additional UI methods
     createWinConditionPanel() {
         const panelWidth = ScaleHelper.scale(400);
-        const panelHeight = ScaleHelper.scale(60);
+        const panelHeight = ScaleHelper.scale(70);
         const x = ScaleHelper.centerX() - panelWidth / 2;
-        const y = ScaleHelper.y(10);
+        const y = ScaleHelper.y(20);
         
         // Panel background
         this.winPanel = this.add.graphics();
@@ -1880,7 +1880,7 @@ class GameArenaScene extends BaseScene {
         this.winPanel.setDepth(0);
         
         // Round Info Text
-        this.roundInfoText = this.add.text(ScaleHelper.centerX(), y + ScaleHelper.scale(20), `Round ${this.round || 1} / 5`, {
+        this.roundInfoText = this.add.text(ScaleHelper.centerX(), y + ScaleHelper.scale(25), `Round ${this.round || 1} / 5`, {
             fontSize: ScaleHelper.font('22px'),
             fontFamily: 'Arial Black',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
@@ -1889,14 +1889,14 @@ class GameArenaScene extends BaseScene {
         }).setOrigin(0.5).setDepth(10);
 
         // Win condition container with text and crystal sprite
-        const winConditionY = y + ScaleHelper.scale(42);
+        const winConditionY = y + ScaleHelper.scale(50);
         
         // Create container for the win condition elements
         this.winConditionContainer = this.add.container(ScaleHelper.centerX(), winConditionY);
         this.winConditionContainer.setDepth(10);
         
         // "Collect 10" text
-        this.collectText = this.add.text(-ScaleHelper.scale(80), 0, `Collect ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET}`, {
+        this.collectText = this.add.text(-ScaleHelper.scale(50), 0, `Collect ${GAME_CONSTANTS.WIN_CONDITIONS.CRYSTAL_TARGET}`, {
             fontSize: ScaleHelper.font('16px'),
             fontFamily: 'Arial',
             fill: '#f5f5dc', // Cream/beige color
@@ -1905,12 +1905,12 @@ class GameArenaScene extends BaseScene {
         }).setOrigin(0.5, 0.5);
         
         // Target crystal sprite (positioned after "Collect 10")
-        this.targetCrystalSprite = this.add.sprite(-ScaleHelper.scale(10), 0, 'crystal');
-        this.targetCrystalSprite.setScale(0.06);
+        this.targetCrystalSprite = this.add.sprite(ScaleHelper.scale(8), 0, 'crystal');
+        this.targetCrystalSprite.setScale(0.18);
         this.targetCrystalSprite.setVisible(false);
         
         // "crystals to win!" text
-        this.crystalsToWinText = this.add.text(ScaleHelper.scale(65), 0, 'crystals to win!', {
+        this.crystalsToWinText = this.add.text(ScaleHelper.scale(75), 0, 'crystals to win!', {
             fontSize: ScaleHelper.font('16px'),
             fontFamily: 'Arial',
             fill: '#f5f5dc', // Cream/beige color
