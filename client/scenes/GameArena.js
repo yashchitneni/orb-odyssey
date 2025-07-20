@@ -67,7 +67,12 @@ class GameArenaScene extends BaseScene {
         this.energy = 100;
         this.lastInputVector = { x: 0, y: 0 };
         this.seriesScores = {};
-        this.currentRound = 1;
+        
+        // Round and target crystal tracking
+        this.round = data?.round || 1;
+        this.targetCrystalType = null;
+        this.crystalTypes = ['crystal', 'crystal1', 'crystal2', 'crystal3', 'crystal4', 'crystal5'];
+        this.currentRound = this.round;
         
         // Clean up any existing tweens
         if (this.tweens) {
@@ -115,6 +120,9 @@ class GameArenaScene extends BaseScene {
 
         this.audioManager.playGameplayMusic();
         this.performanceMonitor.startMonitoring();
+        
+        // Set target crystal for this round
+        this.setTargetCrystal();
 
         if (this.game.socket) {
             this.game.socket.emit('enterArena');
@@ -155,6 +163,27 @@ class GameArenaScene extends BaseScene {
             stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
             strokeThickness: ScaleHelper.scale(2)
         }).setOrigin(0.5, 0);
+        
+        // Round indicator with target crystal
+        this.roundText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(40), `Round ${this.round || 1} / 5`, {
+            fontSize: ScaleHelper.font('16px'),
+            fill: GAME_CONSTANTS.UI.COLORS.PRIMARY,
+            stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
+            strokeThickness: ScaleHelper.scale(2)
+        }).setOrigin(0.5, 0);
+        
+        // Target crystal display
+        this.targetCrystalText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(60), 'Collect: ', {
+            fontSize: ScaleHelper.font('14px'),
+            fill: GAME_CONSTANTS.UI.COLORS.WARNING,
+            stroke: GAME_CONSTANTS.UI.COLORS.BLACK,
+            strokeThickness: ScaleHelper.scale(2)
+        }).setOrigin(1, 0);
+        
+        // Target crystal sprite (will be set when round starts)
+        this.targetCrystalSprite = this.add.sprite(ScaleHelper.centerX() + ScaleHelper.scale(10), ScaleHelper.y(68), 'crystal');
+        this.targetCrystalSprite.setScale(0.08);
+        this.targetCrystalSprite.setVisible(false);
 
         // Connection status
         this.connectionStatus = this.add.text(ScaleHelper.x(15), ScaleHelper.height() - ScaleHelper.scale(30), '● Connected', {
@@ -292,6 +321,31 @@ class GameArenaScene extends BaseScene {
 
     createUI() {
         // Any additional UI elements
+    }
+    
+    setTargetCrystal() {
+        // Randomly select a target crystal type for this round
+        // Use a deterministic selection based on round number to ensure all clients have the same target
+        const targetIndex = (this.round - 1) % this.crystalTypes.length;
+        this.targetCrystalType = this.crystalTypes[targetIndex];
+        
+        // Update the target crystal display
+        if (this.targetCrystalSprite && this.textures.exists(this.targetCrystalType)) {
+            this.targetCrystalSprite.setTexture(this.targetCrystalType);
+            this.targetCrystalSprite.setVisible(true);
+            
+            // Add pulsing effect to target crystal display
+            this.tweens.add({
+                targets: this.targetCrystalSprite,
+                scale: 0.1,
+                duration: 1000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+        }
+        
+        console.log(`[GameArena] Target crystal for round ${this.round}: ${this.targetCrystalType}`);
     }
 
     setupControls() {
@@ -537,11 +591,26 @@ class GameArenaScene extends BaseScene {
         });
 
         this.game.socket.on('crystalCollected', (data) => {
+            const crystal = this.crystals[data.crystalId];
+            const wasTargetCrystal = crystal && crystal.isTargetCrystal;
+            
             this.removeCrystal(data.crystalId);
-            this.updatePlayerCrystals(data.playerId, data.crystalsCollected);
+            
+            // Only update crystals if it was the target type (server should handle this logic)
+            if (data.crystalsCollected !== undefined) {
+                this.updatePlayerCrystals(data.playerId, data.crystalsCollected);
+            }
             
             // Safeguard: Only create effect if position data exists
             if (data.position && data.position.x !== undefined && data.position.y !== undefined) {
+                if (data.playerId === this.myId) {
+                    // Show feedback for collecting wrong crystal
+                    if (!wasTargetCrystal && !data.isPowerCrystal) {
+                        this.createFloatingText(data.position.x, data.position.y, 'Wrong Crystal!', '#ff0000', '16px');
+                    } else if (wasTargetCrystal) {
+                        this.createFloatingText(data.position.x, data.position.y, '+1 Crystal!', '#00ff00', '18px');
+                    }
+                }
                 this.createCrystalCollectionEffect(data.position, data.isPowerCrystal);
             } else {
                 console.warn('Crystal collected but position data missing:', data);
@@ -898,15 +967,34 @@ class GameArenaScene extends BaseScene {
     addCrystal(crystalId, crystalData) {
         if (this.crystals[crystalId]) return;
 
-        const color = crystalData.isPowerCrystal ? 0xff00ff : 0x00ffff;
+        // Determine crystal type - could be the target crystal or a decoy
+        let crystalType = crystalData.crystalType;
+        if (!crystalType) {
+            // If no type specified, randomly assign one (this ensures variety)
+            const typeIndex = Math.floor(Math.random() * this.crystalTypes.length);
+            crystalType = this.crystalTypes[typeIndex];
+        }
+        
+        // Check if this is the target crystal type
+        const isTargetCrystal = crystalType === this.targetCrystalType;
+        
+        // Power crystals always use special coloring
+        const color = crystalData.isPowerCrystal ? 0xff00ff : (isTargetCrystal ? 0x00ff00 : 0xcccccc);
         
         let crystal;
         
         // Try to use the crystal sprite image, fall back to generated shape if not loaded
-        if (this.textures.exists('crystal')) {
-            console.log(`[GameArena] Creating crystal ${crystalId} with sprite image`);
-            crystal = this.add.sprite(crystalData.x, crystalData.y, 'crystal');
-            crystal.setTint(color);
+        if (this.textures.exists(crystalType)) {
+            console.log(`[GameArena] Creating crystal ${crystalId} with type: ${crystalType}, isTarget: ${isTargetCrystal}`);
+            crystal = this.add.sprite(crystalData.x, crystalData.y, crystalType);
+            
+            // Apply tint only for power crystals, let regular crystals show their natural colors
+            if (crystalData.isPowerCrystal) {
+                crystal.setTint(color);
+            } else if (isTargetCrystal) {
+                // Add a glow effect for target crystals
+                crystal.setTint(0xffffff); // Keep original color but may add effects later
+            }
             
             // Scale the sprite image - increased for better visibility
             const scale = crystalData.isPowerCrystal ? 0.12 : 0.1;
@@ -952,15 +1040,50 @@ class GameArenaScene extends BaseScene {
                 ease: 'Linear'
             });
         }
+        
+        // Add glow effect for target crystals
+        if (isTargetCrystal && !crystalData.isPowerCrystal) {
+            // Create a glow sprite behind the crystal
+            const glow = this.add.sprite(crystalData.x, crystalData.y, crystalType);
+            glow.setScale(crystal.scale * 1.5);
+            glow.setAlpha(0.3);
+            glow.setTint(0x00ff00);
+            
+            // Pulsing glow effect
+            this.tweens.add({
+                targets: glow,
+                alpha: 0.6,
+                scale: crystal.scale * 1.8,
+                duration: 1000,
+                yoyo: true,
+                repeat: -1,
+                ease: 'Sine.easeInOut'
+            });
+            
+            // Store glow reference for cleanup
+            crystal.glowEffect = glow;
+            
+            // Move crystal above glow
+            crystal.setDepth(1);
+        }
 
         this.crystals[crystalId] = crystal;
         crystal.crystalId = crystalId;
         crystal.isPowerCrystal = crystalData.isPowerCrystal;
+        crystal.crystalType = crystalType;
+        crystal.isTargetCrystal = isTargetCrystal;
     }
 
     removeCrystal(crystalId) {
         if (this.crystals[crystalId]) {
-            this.crystals[crystalId].destroy();
+            const crystal = this.crystals[crystalId];
+            
+            // Clean up glow effect if it exists
+            if (crystal.glowEffect) {
+                crystal.glowEffect.destroy();
+            }
+            
+            crystal.destroy();
             delete this.crystals[crystalId];
         }
     }

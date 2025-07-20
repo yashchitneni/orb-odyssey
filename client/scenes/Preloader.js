@@ -87,13 +87,25 @@ class Preloader extends BaseScene {
             console.log('[PRELOADER] orb3.png loaded successfully!');
         });
         
-        // Load crystal sprite
-        console.log('[PRELOADER] Loading crystal sprite...');
+        // Load crystal sprites
+        console.log('[PRELOADER] Loading crystal sprites...');
         this.load.image('crystal', 'assets/sprites/crystal.png');
+        this.load.image('crystal1', 'assets/sprites/crystal1.png');
+        this.load.image('crystal2', 'assets/sprites/crystal2.png');
+        this.load.image('crystal3', 'assets/sprites/crystal3.png');
+        this.load.image('crystal4', 'assets/sprites/crystal4.png');
+        this.load.image('crystal5', 'assets/sprites/crystal5.png');
         
         this.load.on('filecomplete-image-crystal', () => {
             console.log('[PRELOADER] crystal.png loaded successfully!');
         });
+        
+        // Add load event listeners for crystal variants
+        for (let i = 1; i <= 5; i++) {
+            this.load.on(`filecomplete-image-crystal${i}`, () => {
+                console.log(`[PRELOADER] crystal${i}.png loaded successfully!`);
+            });
+        }
         
         // Since we don't have actual asset files, we'll create placeholders
         // In production, you would load actual sprite files here
