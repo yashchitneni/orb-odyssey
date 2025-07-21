@@ -86,8 +86,8 @@ class UpgradeScene extends Phaser.Scene {
 
         this.createUpgradeCards(isWinner);
 
-        // Ready button (disabled until upgrade selected) - moved down to avoid overlap
-        this.readyButton = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(420), '← Select an Upgrade/Curse Above →', {
+        // Ready button (disabled until upgrade selected) - increased spacing from cards
+        this.readyButton = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(460), '← Select an Upgrade/Curse Above →', {
             fontSize: ScaleHelper.font('18px'), 
             fill: '#666666',
             backgroundColor: '#222222',
@@ -95,7 +95,7 @@ class UpgradeScene extends Phaser.Scene {
         }).setOrigin(0.5);
         
         // Text for selection feedback
-        this.selectedUpgradeText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(390), '', {
+        this.selectedUpgradeText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(430), '', {
             fontSize: ScaleHelper.font('14px'),
             fill: '#ffffff'
         }).setOrigin(0.5);

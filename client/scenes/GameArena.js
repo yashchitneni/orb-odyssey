@@ -607,9 +607,9 @@ class GameArenaScene extends BaseScene {
                     if (!data.pointsAwarded) {
                         this.createFloatingText(data.position.x, data.position.y, 'Wrong Crystal!', '#ff0000', '16px', true);
                     } else if (data.isPowerCrystal) {
-                        this.createFloatingText(data.position.x, data.position.y, `+${data.value} Power Crystal!`, '#ff00ff', '20px', true);
+                        this.createFloatingText(data.position.x, data.position.y, `+${data.crystalsGained} Crystals!`, '#ff00ff', '20px', true);
                     } else {
-                        this.createFloatingText(data.position.x, data.position.y, '+1 Crystal!', '#00ff00', '18px', true);
+                        this.createFloatingText(data.position.x, data.position.y, `+${data.crystalsGained} Crystal!`, '#00ff00', '18px', true);
                     }
                 }
                 this.createCrystalCollectionEffect(data.position, data.isPowerCrystal);
@@ -989,8 +989,8 @@ class GameArenaScene extends BaseScene {
             crystalType = this.crystalTypes[typeIndex];
         }
         
-        // Check if this is the target crystal type
-        const isTargetCrystal = crystalType === this.targetCrystalType;
+        // Check if this is the target crystal type - USE SERVER VALUE
+        const isTargetCrystal = crystalData.isTargetCrystal;
         
         // Power crystals always use special coloring
         const color = crystalData.isPowerCrystal ? 0xff00ff : (isTargetCrystal ? 0x00ff00 : 0xcccccc);

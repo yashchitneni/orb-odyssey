@@ -218,49 +218,69 @@ class MainMenuScene extends BaseScene {
     }
     
     createButton(x, y, text, callback) {
-        const buttonBg = this.add.graphics();
+        // Create a container to hold the button elements
+        const buttonContainer = this.add.container(x, y);
+        
         const btnWidth = ScaleHelper.x(180);
         const btnHeight = ScaleHelper.y(60);
-        buttonBg.fillGradientStyle(0x00aa00, 0x008800, 0x006600, 0x004400);
-        buttonBg.fillRoundedRect(x - btnWidth/2, y - btnHeight/2, btnWidth, btnHeight, 12);
-        buttonBg.lineStyle(2, 0x00ffff);
-        buttonBg.strokeRoundedRect(x - btnWidth/2, y - btnHeight/2, btnWidth, btnHeight, 12);
         
-        const buttonText = this.add.text(x, y, text, {
+        // Create button background graphics relative to container center
+        const buttonBg = this.add.graphics();
+        buttonBg.fillGradientStyle(0x00aa00, 0x008800, 0x006600, 0x004400);
+        buttonBg.fillRoundedRect(-btnWidth/2, -btnHeight/2, btnWidth, btnHeight, 12);
+        buttonBg.lineStyle(2, 0x00ffff);
+        buttonBg.strokeRoundedRect(-btnWidth/2, -btnHeight/2, btnWidth, btnHeight, 12);
+        
+        // Create text relative to container center
+        const buttonText = this.add.text(0, 0, text, {
             fontSize: ScaleHelper.font('18px'),
             fontWeight: 'bold',
             fill: '#ffffff'
         }).setOrigin(0.5);
         
-        // Make interactive
-        const hitArea = new Phaser.Geom.Rectangle(x - btnWidth/2, y - btnHeight/2, btnWidth, btnHeight);
-        buttonBg.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        // Add elements to container
+        buttonContainer.add([buttonBg, buttonText]);
         
-        buttonBg.on('pointerover', () => {
+        // Make the container interactive
+        buttonContainer.setSize(btnWidth, btnHeight);
+        buttonContainer.setInteractive();
+        
+        // Hover effect - scale the entire container from its center
+        buttonContainer.on('pointerover', () => {
             this.audioManager.playUISound('hover');
             this.tweens.add({
-                targets: [buttonBg, buttonText],
+                targets: buttonContainer,
                 scaleX: 1.05,
                 scaleY: 1.05,
-                duration: 200
+                duration: 200,
+                ease: 'Power2'
             });
         });
         
-        buttonBg.on('pointerout', () => {
+        buttonContainer.on('pointerout', () => {
             this.tweens.add({
-                targets: [buttonBg, buttonText],
+                targets: buttonContainer,
                 scaleX: 1,
                 scaleY: 1,
-                duration: 200
+                duration: 200,
+                ease: 'Power2'
             });
         });
         
-        buttonBg.on('pointerdown', () => {
+        buttonContainer.on('pointerdown', () => {
             this.audioManager.playUISound('click');
-            callback();
+            // Add a press animation
+            this.tweens.add({
+                targets: buttonContainer,
+                scaleX: 0.95,
+                scaleY: 0.95,
+                duration: 100,
+                yoyo: true,
+                onComplete: callback
+            });
         });
         
-        return buttonBg;
+        return buttonContainer;
     }
     
     createConnectionStatus() {
@@ -361,27 +381,45 @@ class MainMenuScene extends BaseScene {
             
             // Join button (only for waiting rooms)
             if (room.status === 'waiting' && room.playerCount < room.maxPlayers) {
-                const joinButton = this.add.text(ScaleHelper.x(550), yPos, 'JOIN', {
+                // Create a container for the join button to fix hover displacement
+                const joinContainer = this.add.container(ScaleHelper.x(550), yPos);
+                
+                const joinButton = this.add.text(0, 0, 'JOIN', {
                     fontSize: ScaleHelper.font('14px'),
                     fill: '#00ffff',
                     backgroundColor: '#003333',
                     padding: { x: 10, y: 5 }
-                });
+                }).setOrigin(0.5);
                 
-                joinButton.setInteractive();
-                joinButton.on('pointerover', () => {
+                joinContainer.add(joinButton);
+                joinContainer.setSize(joinButton.width, joinButton.height);
+                joinContainer.setInteractive();
+                
+                joinContainer.on('pointerover', () => {
                     this.audioManager.playUISound('hover');
-                    joinButton.setScale(1.1);
+                    this.tweens.add({
+                        targets: joinContainer,
+                        scaleX: 1.1,
+                        scaleY: 1.1,
+                        duration: 100,
+                        ease: 'Power2'
+                    });
                 });
-                joinButton.on('pointerout', () => {
-                    joinButton.setScale(1);
+                joinContainer.on('pointerout', () => {
+                    this.tweens.add({
+                        targets: joinContainer,
+                        scaleX: 1,
+                        scaleY: 1,
+                        duration: 100,
+                        ease: 'Power2'
+                    });
                 });
-                joinButton.on('pointerdown', () => {
+                joinContainer.on('pointerdown', () => {
                     this.audioManager.playUISound('click');
                     this.joinRoom(room.id);
                 });
                 
-                this.roomListContainer.add(joinButton);
+                this.roomListContainer.add(joinContainer);
             }
             
             this.roomListContainer.add([roomText, hostText, playerCountText, statusText]);

@@ -5,7 +5,7 @@ const GAME_CONSTANTS = {
     ORB_RADIUS: 10,
     PLAYER_SPEED: 300,  // Increased from 200 for higher top speed
     GAME_DURATION: 120,
-    ORB_COUNT: 20,
+    ORB_COUNT: 40,
     ORB_SPAWN_DELAY: 1000,
     POINTS_PER_ORB: 10,
     SERVER_UPDATE_RATE: 50,
@@ -30,11 +30,11 @@ const GAME_CONSTANTS = {
     VIRTUAL_JOYSTICK_DEAD_ZONE: 0.15,
     
     // Crystal constants
-    CRYSTAL_COUNT_MIN: 10,
-    CRYSTAL_COUNT_MAX: 15,
+    CRYSTAL_COUNT_MIN: 20,
+    CRYSTAL_COUNT_MAX: 30,
     CRYSTAL_RADIUS: 5,  // Reduced from 8 for smaller crystal appearance
-    CRYSTAL_RESPAWN_MIN: 5000, // 5 seconds
-    CRYSTAL_RESPAWN_MAX: 15000, // 15 seconds
+    CRYSTAL_RESPAWN_MIN: 3000, // 1 second
+    CRYSTAL_RESPAWN_MAX: 7000, // 3 seconds
     POINTS_PER_CRYSTAL: 10,
     POINTS_PER_POWER_CRYSTAL: 50, // 5x regular crystal value
     POWER_CRYSTAL_CHANCE: 0.05, // 5% chance
@@ -44,11 +44,11 @@ const GAME_CONSTANTS = {
     
     // Level system constants
     LEVELS: {
-        THRESHOLDS: [0, 20, 50, 80, 100], // Index represents level-1
+        THRESHOLDS: [0, 5, 10, 15, 20, 25], // L1:0, L2:5, L3:10, L4:15, L5:20, L6:25
         BASE_SIZE: 20,
-        SIZE_MULTIPLIERS: [1, 1.5, 2, 2.5], // Index represents level-1
-        SPEED_MULTIPLIERS: [1, 1.2, 1.3, 1.4], // Index represents level-1
-        GLOW_MULTIPLIERS: [1, 1.3, 1.6, 2] // Index represents level-1
+        SIZE_MULTIPLIERS: [1, 1.5, 2, 2.5, 3.0, 3.5], // Added L6
+        SPEED_MULTIPLIERS: [1, 1.2, 1.3, 1.4, 1.5, 1.6], // Added L6
+        GLOW_MULTIPLIERS: [1, 1.3, 1.6, 2, 2.4, 2.8] // Added L6
     },
     
     // Ability constants

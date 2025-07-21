@@ -12,7 +12,7 @@ class LobbyScene extends BaseScene {
         this.roomId = data.roomId;
         this.playerId = data.playerId;
         this.isHost = data.isHost || false;
-        this.isConnected = true; // Track connection status
+        // Connection status will be checked from socket.connected in create()
     }
 
     create() {
@@ -43,6 +43,10 @@ class LobbyScene extends BaseScene {
         this.createGameInfoPanel();
 
         if (this.game.socket) {
+            // Check current connection status immediately
+            this.isConnected = this.game.socket.connected;
+            console.log('[LOBBY] Initial connection status:', this.isConnected);
+            
             // Remove any existing listeners to prevent duplicates
             this.game.socket.off('playerList');
             this.game.socket.off('gameStart');
@@ -82,6 +86,9 @@ class LobbyScene extends BaseScene {
             this.game.socket.on('disconnect', () => {
                 this.updateConnectionStatus(false);
             });
+            
+            // Update connection status UI immediately
+            this.updateConnectionStatus(this.isConnected);
         }
     }
 
@@ -310,21 +317,21 @@ class LobbyScene extends BaseScene {
             fill: GAME_CONSTANTS.UI.COLORS.SECONDARY
         }).setOrigin(0.5);
         
-        // Player list container
-        this.playerListContainer = this.add.container(ScaleHelper.x(220), ScaleHelper.y(310));
+        // Player list container - adjusted position to accommodate headers
+        this.playerListContainer = this.add.container(ScaleHelper.x(220), ScaleHelper.y(340));
         
-        // Column headers
-        this.add.text(ScaleHelper.x(220), ScaleHelper.y(300), 'Player', {
+        // Column headers - increased spacing from title
+        this.add.text(ScaleHelper.x(220), ScaleHelper.y(315), 'Player', {
             fontSize: ScaleHelper.font('16px'),
             fontWeight: 'bold',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE
         });
-        this.add.text(ScaleHelper.x(450), ScaleHelper.y(300), 'Status', {
+        this.add.text(ScaleHelper.x(450), ScaleHelper.y(315), 'Status', {
             fontSize: ScaleHelper.font('16px'),
             fontWeight: 'bold',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE
         });
-        this.add.text(ScaleHelper.x(550), ScaleHelper.y(300), 'Ready', {
+        this.add.text(ScaleHelper.x(550), ScaleHelper.y(315), 'Ready', {
             fontSize: ScaleHelper.font('16px'),
             fontWeight: 'bold',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE
@@ -332,15 +339,21 @@ class LobbyScene extends BaseScene {
     }
     
     createStartButton() {
-        // Start button background
+        // Create container to hold button elements
+        this.startButtonContainer = this.add.container(ScaleHelper.centerX(), ScaleHelper.y(510));
+        
+        const btnWidth = ScaleHelper.x(200);
+        const btnHeight = ScaleHelper.y(60);
+        
+        // Start button background - positioned relative to container
         this.startButtonBg = this.add.graphics();
         this.startButtonBg.fillGradientStyle(0x00ff00, 0x00aa00, 0x008800, 0x004400);
-        this.startButtonBg.fillRoundedRect(ScaleHelper.x(300), ScaleHelper.y(480), ScaleHelper.x(200), ScaleHelper.y(60), 16);
+        this.startButtonBg.fillRoundedRect(-btnWidth/2, -btnHeight/2, btnWidth, btnHeight, 16);
         this.startButtonBg.lineStyle(3, 0x00ffff);
-        this.startButtonBg.strokeRoundedRect(ScaleHelper.x(300), ScaleHelper.y(480), ScaleHelper.x(200), ScaleHelper.y(60), 16);
+        this.startButtonBg.strokeRoundedRect(-btnWidth/2, -btnHeight/2, btnWidth, btnHeight, 16);
         
-        // Start button text
-        this.startButtonText = this.add.text(ScaleHelper.centerX(), ScaleHelper.y(510), 'START GAME', {
+        // Start button text - positioned relative to container
+        this.startButtonText = this.add.text(0, 0, 'START GAME', {
             fontSize: ScaleHelper.font('24px'),
             fontFamily: 'Arial Black',
             fill: GAME_CONSTANTS.UI.COLORS.WHITE,
@@ -348,54 +361,61 @@ class LobbyScene extends BaseScene {
             strokeThickness: 2
         }).setOrigin(0.5);
         
-        // Make button interactive
-        this.startButtonBg.setInteractive(new Phaser.Geom.Rectangle(ScaleHelper.x(300), ScaleHelper.y(480), ScaleHelper.x(200), ScaleHelper.y(60)), Phaser.Geom.Rectangle.Contains);
-        this.startButtonText.setInteractive();
+        // Add elements to container
+        this.startButtonContainer.add([this.startButtonBg, this.startButtonText]);
         
-        // Button hover effects
-        [this.startButtonBg, this.startButtonText].forEach(element => {
-            element.on('pointerover', () => {
-                this.audioManager.playUISound('hover');
-                this.tweens.add({
-                    targets: [this.startButtonBg, this.startButtonText],
-                    scaleX: 1.05,
-                    scaleY: 1.05,
-                    duration: 200
-                });
+        // Make container interactive
+        this.startButtonContainer.setSize(btnWidth, btnHeight);
+        this.startButtonContainer.setInteractive();
+        
+        // Button hover effects - scale the container
+        this.startButtonContainer.on('pointerover', () => {
+            this.audioManager.playUISound('hover');
+            this.tweens.add({
+                targets: this.startButtonContainer,
+                scaleX: 1.05,
+                scaleY: 1.05,
+                duration: 200,
+                ease: 'Power2'
             });
-            
-            element.on('pointerout', () => {
-                this.tweens.add({
-                    targets: [this.startButtonBg, this.startButtonText],
-                    scaleX: 1,
-                    scaleY: 1,
-                    duration: 200
-                });
+        });
+        
+        this.startButtonContainer.on('pointerout', () => {
+            this.tweens.add({
+                targets: this.startButtonContainer,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 200,
+                ease: 'Power2'
             });
+        });
+        
+        this.startButtonContainer.on('pointerdown', () => {
+            this.audioManager.playUISound('click');
             
-            element.on('pointerdown', () => {
-                this.audioManager.playUISound('click');
-                
-                // Visual feedback
-                this.tweens.add({
-                    targets: [this.startButtonBg, this.startButtonText],
-                    scaleX: 0.95,
-                    scaleY: 0.95,
-                    duration: 100,
-                    yoyo: true
-                });
-                
-                if (this.game.socket) {
-                    this.game.socket.emit('startGame');
+            // Visual feedback
+            this.tweens.add({
+                targets: this.startButtonContainer,
+                scaleX: 0.95,
+                scaleY: 0.95,
+                duration: 100,
+                yoyo: true,
+                onComplete: () => {
+                    if (this.game.socket && this.isHost && this.players.length >= 2) {
+                        this.game.socket.emit('startGame');
+                    }
                 }
             });
         });
         
-        // Pulsing glow effect when ready
+        // Pulsing glow effect when ready - add to container
         this.startButtonGlow = this.add.graphics();
         this.startButtonGlow.fillStyle(0x00ff00, 0.3);
-        this.startButtonGlow.fillRoundedRect(ScaleHelper.x(295), ScaleHelper.y(475), ScaleHelper.x(210), ScaleHelper.y(70), 20);
+        this.startButtonGlow.fillRoundedRect(-btnWidth/2 - 5, -btnHeight/2 - 5, btnWidth + 10, btnHeight + 10, 20);
         this.startButtonGlow.setVisible(false);
+        
+        // Add glow behind button elements
+        this.startButtonContainer.addAt(this.startButtonGlow, 0);
         
         this.tweens.add({
             targets: this.startButtonGlow,
@@ -488,28 +508,63 @@ E - Wall (L4+)`;
             players.forEach((player, index) => {
                 const yPos = index * ScaleHelper.y(30);
                 
-                // Player indicator circle
-                const indicator = this.add.circle(0, yPos + ScaleHelper.y(10), ScaleHelper.scale(8), player.color || 0x00ff00);
+                // Check if this player is the current player
+                const isCurrentPlayer = player.id === this.playerId || player.socketId === this.game.socket?.id;
+                const isHost = index === 0; // First player in list is the host
+                
+                // Player indicator circle - yellow for current player
+                const indicatorColor = isCurrentPlayer ? 0xffff00 : (player.color || 0x00ff00);
+                const indicator = this.add.circle(0, yPos + ScaleHelper.y(10), ScaleHelper.scale(8), indicatorColor);
+                
+                // Add glow effect for current player
+                if (isCurrentPlayer) {
+                    const glow = this.add.circle(0, yPos + ScaleHelper.y(10), ScaleHelper.scale(12), 0xffff00, 0.3);
+                    this.playerListContainer.add(glow);
+                    
+                    // Pulsing animation for current player indicator
+                    this.tweens.add({
+                        targets: glow,
+                        scaleX: 1.2,
+                        scaleY: 1.2,
+                        alpha: 0.1,
+                        duration: 1000,
+                        yoyo: true,
+                        repeat: -1,
+                        ease: 'Sine.easeInOut'
+                    });
+                }
                 
                 // Player name with host indicator
-                const isHost = index === 0; // First player in list is the host
                 const namePrefix = isHost ? '👑 ' : '';
-                const nameText = this.add.text(ScaleHelper.x(20), yPos, namePrefix + (player.name || `Player ${index + 1}`), {
+                const displayName = (isCurrentPlayer ? '▶ ' : '') + namePrefix + (player.name || `Player ${index + 1}`);
+                const nameColor = isCurrentPlayer ? '#ffff00' : (isHost ? '#ffd700' : GAME_CONSTANTS.UI.COLORS.WHITE);
+                
+                const nameText = this.add.text(ScaleHelper.x(20), yPos, displayName, {
                     fontSize: ScaleHelper.font('16px'),
-                    fill: isHost ? '#ffd700' : GAME_CONSTANTS.UI.COLORS.WHITE,
+                    fill: nameColor,
                     fontWeight: 'bold'
                 });
+                
+                // Add "(You)" text for current player
+                if (isCurrentPlayer) {
+                    const youText = this.add.text(ScaleHelper.x(140), yPos, '(You)', {
+                        fontSize: ScaleHelper.font('14px'),
+                        fill: '#ffff00',
+                        fontStyle: 'italic'
+                    });
+                    this.playerListContainer.add(youText);
+                }
                 
                 // Player status
                 const statusText = this.add.text(ScaleHelper.x(230), yPos, 'Connected', {
                     fontSize: ScaleHelper.font('14px'),
-                    fill: GAME_CONSTANTS.UI.COLORS.SUCCESS
+                    fill: isCurrentPlayer ? '#ffff00' : GAME_CONSTANTS.UI.COLORS.SUCCESS
                 });
                 
                 // Ready indicator
                 const readyIndicator = this.add.text(ScaleHelper.x(330), yPos, '✓', {
                     fontSize: ScaleHelper.font('16px'),
-                    fill: GAME_CONSTANTS.UI.COLORS.SUCCESS
+                    fill: isCurrentPlayer ? '#ffff00' : GAME_CONSTANTS.UI.COLORS.SUCCESS
                 });
                 
                 this.playerListContainer.add([indicator, nameText, statusText, readyIndicator]);
@@ -542,16 +597,13 @@ E - Wall (L4+)`;
             // Update button appearance
             this.startButtonText.setText(buttonText);
             this.startButtonGlow.setVisible(canInteract);
-            this.startButtonBg.setAlpha(buttonAlpha);
-            this.startButtonText.setAlpha(buttonAlpha);
+            this.startButtonContainer.setAlpha(buttonAlpha);
             
             // Update button interactivity
             if (canInteract) {
-                this.startButtonBg.setInteractive();
-                this.startButtonText.setInteractive();
+                this.startButtonContainer.setInteractive();
             } else {
-                this.startButtonBg.disableInteractive();
-                this.startButtonText.disableInteractive();
+                this.startButtonContainer.disableInteractive();
             }
             
             // Update status text
